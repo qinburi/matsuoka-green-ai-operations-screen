@@ -2,6 +2,12 @@
 
 独立交互原型：保留现有大屏底图，通过统一入口和三个业务热点进入生产效率、质量分析与工艺改善诊断。
 
+## 版本与访问
+
+- 当前版本：`v1.0.0`
+- 在线演示：<https://qinburi.github.io/matsuoka-green-ai-operations-screen/>
+- 源码仓库：<https://github.com/qinburi/matsuoka-green-ai-operations-screen>
+
 ## 运行
 
 ```bash
