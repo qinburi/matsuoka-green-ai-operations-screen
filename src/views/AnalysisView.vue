@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import EChart from '../components/EChart.vue'
 import InferencePipeline from '../components/InferencePipeline.vue'
 import IssueDrawer from '../components/IssueDrawer.vue'
+import VersionDialog from '../components/VersionDialog.vue'
 import { buildProblemMapOption, buildRankingOption, buildTrendOption } from '../chart-options'
 import { contextOptions, defaultContext, sourceLabels, stateLabels, topics } from '../data/demo'
 import type { DataState, Issue, TopicId } from '../types'
@@ -150,6 +151,7 @@ onBeforeUnmount(clearTimers)
       </nav>
 
       <div class="header-meta">
+        <VersionDialog />
         <span class="demo-badge">演示数据</span>
         <div><small>数据更新</small><strong>{{ updatedText }}</strong></div>
       </div>

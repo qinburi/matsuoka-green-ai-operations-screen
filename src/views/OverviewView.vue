@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { useRouter } from 'vue-router'
+import VersionDialog from '../components/VersionDialog.vue'
 import { entryContexts } from '../data/demo'
 
 const router = useRouter()
@@ -31,6 +32,8 @@ function enter(entry: keyof typeof entryContexts) {
         <span class="ai-entry__signal" />
         <span>绿色AI分析</span>
       </button>
+
+      <VersionDialog />
 
       <button
         class="screen-hotspot screen-hotspot--production"

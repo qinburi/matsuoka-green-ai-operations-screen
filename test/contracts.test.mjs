@@ -1,6 +1,9 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
 import { hotspotContexts, rawTopics } from '../src/data/demo-raw.mjs'
+
+const readProjectFile = (path) => readFileSync(new URL(`../${path}`, import.meta.url), 'utf-8')
 
 test('四个入口都映射到可用分析主题', () => {
   assert.deepEqual(Object.keys(hotspotContexts).sort(), ['defects', 'overview', 'production', 'progress'])
@@ -39,4 +42,16 @@ test('所有指标与证据来源都明确标识为演示', () => {
       for (const ref of item.knowledgeRefs) assert.match(ref.version, /演示版/)
     }
   }
+})
+
+test('v1.0.0版本入口由项目版本驱动并覆盖两个页面', () => {
+  const packageJson = JSON.parse(readProjectFile('package.json'))
+  const versionSource = readProjectFile('src/version.ts')
+  const overviewSource = readProjectFile('src/views/OverviewView.vue')
+  const analysisSource = readProjectFile('src/views/AnalysisView.vue')
+
+  assert.equal(packageJson.version, '1.0.0')
+  assert.match(versionSource, /v\$\{__APP_VERSION__\}/)
+  assert.match(overviewSource, /<VersionDialog \/>/)
+  assert.match(analysisSource, /<VersionDialog \/>/)
 })
