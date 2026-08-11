@@ -4,6 +4,7 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import EChart from './EChart.vue'
 import { buildFactoryFallbackOption } from '../chart-options'
+import { createProcessIsland } from '../scene/process-islands'
 import type { CameraPreset, DataState, FactoryZone } from '../types'
 
 const props = defineProps<{
@@ -31,6 +32,9 @@ const labelElements = new Map<string, HTMLElement>()
 const zoneGroups = new Map<string, THREE.Group>()
 const signalMeshes = new Map<string, THREE.Mesh>()
 const zoneMaterials = new Map<string, THREE.MeshStandardMaterial[]>()
+const processAnimations = new Map<string, (elapsedSeconds: number, active: boolean) => void>()
+const raycaster = new THREE.Raycaster()
+const pointer = new THREE.Vector2()
 
 let scene: THREE.Scene | null = null
 let camera: THREE.PerspectiveCamera | null = null
@@ -43,6 +47,7 @@ let pulseStartedAt = 0
 let flowPoints: THREE.Points | null = null
 let flowSamples: THREE.Vector3[] = []
 let mediaQuery: MediaQueryList | null = null
+let pointerStart: { x: number; y: number } | null = null
 let cameraTween: {
   startedAt: number
   duration: number
@@ -127,39 +132,27 @@ function createZone(zone: FactoryZone) {
   })
   zoneMaterials.set(zone.id, [baseMaterial, roofMaterial])
 
-  const base = new THREE.Mesh(new THREE.BoxGeometry(3.05, 0.24, 1.95), baseMaterial)
-  base.position.y = 0.02
+  const base = new THREE.Mesh(new THREE.BoxGeometry(3.05, 0.2, 1.95), baseMaterial)
+  base.position.y = 0
   base.castShadow = true
   base.receiveShadow = true
   group.add(base)
 
-  const body = new THREE.Mesh(new THREE.BoxGeometry(2.66, 0.78, 1.56), roofMaterial)
-  body.position.y = 0.52
+  const body = new THREE.Mesh(new THREE.BoxGeometry(2.72, 0.3, 1.62), roofMaterial)
+  body.position.y = 0.25
   body.castShadow = true
   group.add(body)
 
   const edges = new THREE.LineSegments(
-    new THREE.EdgesGeometry(new THREE.BoxGeometry(2.7, 0.82, 1.6)),
+    new THREE.EdgesGeometry(new THREE.BoxGeometry(2.76, 0.34, 1.66)),
     new THREE.LineBasicMaterial({ color: accent, transparent: true, opacity: 0.52 }),
   )
-  edges.position.y = 0.52
+  edges.position.y = 0.25
   group.add(edges)
 
-  const stationGeometry = new THREE.BoxGeometry(0.25, 0.24, 0.32)
-  const stationMaterial = new THREE.MeshStandardMaterial({ color: 0xc4d2d5, emissive: 0x24383b, emissiveIntensity: 0.45, roughness: 0.36 })
-  const stations = new THREE.InstancedMesh(stationGeometry, stationMaterial, zone.stationCount)
-  const matrix = new THREE.Matrix4()
-  const columns = Math.max(3, Math.ceil(Math.sqrt(zone.stationCount * 1.7)))
-  for (let index = 0; index < zone.stationCount; index += 1) {
-    const row = Math.floor(index / columns)
-    const column = index % columns
-    const x = -0.94 + column * (1.88 / Math.max(1, columns - 1))
-    const z = -0.45 + row * 0.48
-    matrix.makeTranslation(x, 1.08, z)
-    stations.setMatrixAt(index, matrix)
-  }
-  stations.instanceMatrix.needsUpdate = true
-  group.add(stations)
+  const processIsland = createProcessIsland(zone, accent)
+  group.add(processIsland.group)
+  processAnimations.set(zone.id, processIsland.update)
 
   const signalMaterial = new THREE.MeshStandardMaterial({
     color: accent,
@@ -170,12 +163,12 @@ function createZone(zone: FactoryZone) {
   })
   const signal = new THREE.Mesh(new THREE.TorusGeometry(0.36, 0.035, 10, 40), signalMaterial)
   signal.rotation.x = Math.PI / 2
-  signal.position.set(0, 1.62, 0)
+  signal.position.set(0, 1.86, 0)
   signalMeshes.set(zone.id, signal)
   group.add(signal)
 
   const beacon = new THREE.Mesh(new THREE.SphereGeometry(0.08, 16, 12), signalMaterial.clone())
-  beacon.position.set(0, 1.62, 0)
+  beacon.position.set(0, 1.86, 0)
   group.add(beacon)
 
   return group
@@ -210,7 +203,7 @@ function createFlow(targetScene: THREE.Scene) {
 }
 
 function updateFlow(elapsedSeconds: number) {
-  if (!flowPoints || !flowSamples.length || reducedMotion.value) return
+  if (!flowPoints || !flowSamples.length || reducedMotion.value || blockingState.value) return
   const attribute = flowPoints.geometry.getAttribute('position') as THREE.BufferAttribute
   for (let index = 0; index < attribute.count; index += 1) {
     const sampleIndex = Math.floor((index * 7 + elapsedSeconds * 6) % flowSamples.length)
@@ -220,6 +213,26 @@ function updateFlow(elapsedSeconds: number) {
   attribute.needsUpdate = true
 }
 
+function handlePointerDown(event: PointerEvent) {
+  pointerStart = { x: event.clientX, y: event.clientY }
+}
+
+function handlePointerUp(event: PointerEvent) {
+  const start = pointerStart
+  pointerStart = null
+  if (!start || !camera || !canvasEl.value || !labelsVisible.value) return
+  const distance = Math.hypot(event.clientX - start.x, event.clientY - start.y)
+  if (distance > 6) return
+  const rect = canvasEl.value.getBoundingClientRect()
+  pointer.x = ((event.clientX - rect.left) / rect.width) * 2 - 1
+  pointer.y = -((event.clientY - rect.top) / rect.height) * 2 + 1
+  raycaster.setFromCamera(pointer, camera)
+  const hit = raycaster.intersectObjects([...zoneGroups.values()], true)[0]
+  let target: THREE.Object3D | null = hit?.object ?? null
+  while (target && !target.userData.zoneId) target = target.parent
+  if (typeof target?.userData.zoneId === 'string') chooseZone(target.userData.zoneId)
+}
+
 function projectLabels() {
   if (!camera || !hostEl.value) return
   const width = hostEl.value.clientWidth
@@ -227,7 +240,7 @@ function projectLabels() {
   props.zones.forEach((zone) => {
     const element = labelElements.get(zone.id)
     if (!element) return
-    const point = new THREE.Vector3(zone.position[0], 2.05, zone.position[2]).project(camera!)
+    const point = new THREE.Vector3(zone.position[0], 2.25, zone.position[2]).project(camera!)
     const x = (point.x * 0.5 + 0.5) * width
     const y = (-point.y * 0.5 + 0.5) * height
     const visible = point.z > -1 && point.z < 1 && x > -80 && x < width + 80 && y > -50 && y < height + 50
@@ -267,6 +280,7 @@ function applyCameraPreset(preset: CameraPreset) {
 }
 
 function updateActiveZone(now: number) {
+  const animationsPaused = reducedMotion.value || Boolean(blockingState.value)
   props.zones.forEach((zone) => {
     const active = zone.id === props.activeZoneId
     const group = zoneGroups.get(zone.id)
@@ -274,14 +288,15 @@ function updateActiveZone(now: number) {
     if (group) {
       const targetScale = active ? 1.055 : 1
       group.scale.lerp(new THREE.Vector3(targetScale, targetScale, targetScale), 0.08)
+      group.position.y += ((active ? zone.position[1] + 0.11 : zone.position[1]) - group.position.y) * 0.08
     }
     materials?.forEach((material, index) => {
       material.emissiveIntensity = active ? (index === 0 ? 0.12 : 0.42) : (index === 0 ? 0 : zone.health === 'critical' ? 0.18 : 0.08)
     })
     const signal = signalMeshes.get(zone.id)
     if (!signal) return
-    signal.rotation.z += reducedMotion.value ? 0 : 0.004
-    if (active && now - pulseStartedAt < 2100) {
+    signal.rotation.z += animationsPaused ? 0 : 0.004
+    if (active && !animationsPaused && now - pulseStartedAt < 2100) {
       const cycle = ((now - pulseStartedAt) % 700) / 700
       const scale = 1 + Math.sin(cycle * Math.PI) * 0.28
       signal.scale.setScalar(scale)
@@ -289,6 +304,11 @@ function updateActiveZone(now: number) {
       signal.scale.lerp(new THREE.Vector3(1, 1, 1), 0.12)
     }
   })
+}
+
+function updateProcessMotions(elapsedSeconds: number) {
+  if (reducedMotion.value || blockingState.value) return
+  processAnimations.forEach((update, zoneId) => update(elapsedSeconds, zoneId === props.activeZoneId))
 }
 
 function renderLoop(now: number) {
@@ -300,6 +320,7 @@ function renderLoop(now: number) {
   lastFrameAt = now
   animateCamera(now)
   updateFlow(elapsedSeconds)
+  updateProcessMotions(elapsedSeconds)
   updateActiveZone(now)
   controls.update()
   projectLabels()
@@ -319,6 +340,8 @@ function disposeScene() {
   if (animationFrame) window.cancelAnimationFrame(animationFrame)
   resizeObserver?.disconnect()
   controls?.dispose()
+  canvasEl.value?.removeEventListener('pointerdown', handlePointerDown)
+  canvasEl.value?.removeEventListener('pointerup', handlePointerUp)
   scene?.traverse((object) => {
     if (object instanceof THREE.Mesh || object instanceof THREE.Line || object instanceof THREE.Points || object instanceof THREE.LineSegments) {
       object.geometry?.dispose()
@@ -332,6 +355,8 @@ function disposeScene() {
   zoneGroups.clear()
   signalMeshes.clear()
   zoneMaterials.clear()
+  processAnimations.clear()
+  pointerStart = null
   scene = null
   camera = null
   renderer = null
@@ -387,6 +412,8 @@ async function initializeScene() {
       cameraTween = null
       emit('manualInteraction')
     })
+    canvasEl.value.addEventListener('pointerdown', handlePointerDown)
+    canvasEl.value.addEventListener('pointerup', handlePointerUp)
 
     scene.add(new THREE.HemisphereLight(0xbcd7db, 0x071012, 1.35))
     const keyLight = new THREE.DirectionalLight(0xf0fbff, 2.6)

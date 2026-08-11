@@ -5,6 +5,16 @@ export type ExperienceMode = 'guided' | 'explore'
 export type ZoneHealth = 'normal' | 'attention' | 'warning' | 'critical'
 export type RelationType = 'fact' | 'correlation' | 'ai-hypothesis' | 'confirmed-cause'
 export type ConfirmationState = 'confirmed' | 'pending'
+export type ProcessVisualKind =
+  | 'cutting'
+  | 'sewing'
+  | 'inspection-inbound'
+  | 'special-cell'
+  | 'inspection-queue'
+  | 'finishing'
+  | 'inspection-final'
+  | 'folding'
+  | 'warehouse'
 
 export interface MetricDefinition {
   id: string
@@ -97,6 +107,13 @@ export interface CameraPreset {
   duration: number
 }
 
+export interface ProcessNodeVisual {
+  kind: ProcessVisualKind
+  scale: number
+  offset: [number, number, number]
+  motionRate: number
+}
+
 export interface FactoryZone {
   id: string
   label: string
@@ -108,6 +125,7 @@ export interface FactoryZone {
   metricValue: string
   issueIds: string[]
   stationCount: number
+  visual: ProcessNodeVisual
 }
 
 export interface SceneNode {

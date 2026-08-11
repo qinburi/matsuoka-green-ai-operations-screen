@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import * as echarts from 'echarts/core'
+import type { EChartsCoreOption } from 'echarts/core'
 import { BarChart, GraphChart, LineChart, ScatterChart } from 'echarts/charts'
 import { GridComponent, LegendComponent, TooltipComponent } from 'echarts/components'
 import { CanvasRenderer } from 'echarts/renderers'
@@ -18,7 +19,7 @@ echarts.use([
 ])
 
 const props = withDefaults(defineProps<{
-  option: echarts.EChartsOption
+  option: EChartsCoreOption
   state?: DataState | 'loading'
   emptyText?: string
 }>(), {

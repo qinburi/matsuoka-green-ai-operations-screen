@@ -66,13 +66,28 @@ test('v2.0.0版本入口由项目版本驱动并保留v1历史', () => {
 
 test('抽象数字孪生覆盖九个工序并可追溯到问题', () => {
   assert.equal(factoryZonesRaw.length, 9)
+  const visualKinds = new Set()
   const issueIds = new Set(Object.values(rawTopics).flatMap((topic) => topic.issues.map((issue) => issue.id)))
   for (const zone of factoryZonesRaw) {
     assert.equal(zone.position.length, 3)
     assert.ok(zone.stationCount > 0)
     assert.match(zone.health, /^(normal|attention|warning|critical)$/)
+    assert.ok(zone.visual)
+    assert.ok(zone.visual.scale > 0)
+    assert.ok(zone.visual.motionRate > 0)
+    assert.equal(zone.visual.offset.length, 3)
+    visualKinds.add(zone.visual.kind)
     for (const issueId of zone.issueIds) assert.ok(issueIds.has(issueId), `${zone.id} references missing issue ${issueId}`)
   }
+  assert.equal(visualKinds.size, 9)
+})
+
+test('工序岛由Three.js程序化几何构成且不依赖位图资产', () => {
+  const processIslandSource = readProjectFile('src/scene/process-islands.ts')
+
+  assert.match(processIslandSource, /THREE\.InstancedMesh/)
+  assert.match(processIslandSource, /THREE\.(?:BoxGeometry|CylinderGeometry|TorusGeometry)/)
+  assert.doesNotMatch(processIslandSource, /TextureLoader|CanvasTexture|THREE\.Sprite|\.webp|\.png|\.jpe?g/)
 })
 
 test('90秒演示章节、镜头与业务聚焦完整', () => {

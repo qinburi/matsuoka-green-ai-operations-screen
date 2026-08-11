@@ -1,13 +1,13 @@
 export const factoryZonesRaw = Object.freeze([
-  { id: 'cutting', label: '裁断任务区', shortLabel: '裁断', stage: '裁断', position: [-7.2, 0, -2.7], health: 'warning', metric: '计划偏差', metricValue: '152 pcs', issueIds: ['EFF-003', 'QUA-005'], stationCount: 8 },
-  { id: 'sewing', label: '缝制三组', shortLabel: '缝制', stage: '缝制', position: [-4.5, 0, 0.2], health: 'critical', metric: '在制 / 不良', metricValue: '214 / 26 pcs', issueIds: ['EFF-002', 'QUA-001', 'QUA-002', 'QUA-003'], stationCount: 18 },
-  { id: 'qc1', label: 'QC1 检验', shortLabel: 'QC1', stage: 'QC1', position: [-1.8, 0, -2.7], health: 'normal', metric: '状态', metricValue: '正常', issueIds: [], stationCount: 6 },
-  { id: 'special', label: '特殊工艺', shortLabel: '特殊', stage: '特殊工艺', position: [0.9, 0, 0.2], health: 'warning', metric: '换款等待', metricValue: '96 pcs', issueIds: ['EFF-004', 'IMP-004'], stationCount: 7 },
-  { id: 'qc21', label: 'QC2-1 待检区', shortLabel: 'QC2-1', stage: 'QC2-1', position: [3.6, 0, -2.7], health: 'critical', metric: '延误风险', metricValue: '286 pcs', issueIds: ['EFF-001'], stationCount: 10 },
-  { id: 'finishing', label: '整理作业区', shortLabel: '整理', stage: '整理', position: [6.3, 0, 0.2], health: 'normal', metric: '状态', metricValue: '正常', issueIds: [], stationCount: 8 },
-  { id: 'qc22', label: 'QC2-2 终检', shortLabel: 'QC2-2', stage: 'QC2-2', position: [3.6, 0, 3.1], health: 'normal', metric: '状态', metricValue: '正常', issueIds: [], stationCount: 7 },
-  { id: 'folding', label: '叠衣作业区', shortLabel: '叠衣', stage: '叠衣', position: [0.9, 0, 3.1], health: 'normal', metric: '状态', metricValue: '正常', issueIds: [], stationCount: 9 },
-  { id: 'warehouse', label: '出荷前仓库', shortLabel: '仓库', stage: '出荷前仓库', position: [-1.8, 0, 3.1], health: 'attention', metric: '待放行', metricValue: '64 pcs', issueIds: ['EFF-005'], stationCount: 12 },
+  { id: 'cutting', label: '裁断任务区', shortLabel: '裁断', stage: '裁断', position: [-7.2, 0, -2.7], health: 'warning', metric: '计划偏差', metricValue: '152 pcs', issueIds: ['EFF-003', 'QUA-005'], stationCount: 8, visual: { kind: 'cutting', scale: 1, offset: [0, 0, 0], motionRate: 0.82 } },
+  { id: 'sewing', label: '缝制三组', shortLabel: '缝制', stage: '缝制', position: [-4.5, 0, 0.2], health: 'critical', metric: '在制 / 不良', metricValue: '214 / 26 pcs', issueIds: ['EFF-002', 'QUA-001', 'QUA-002', 'QUA-003'], stationCount: 18, visual: { kind: 'sewing', scale: 0.96, offset: [0, 0, 0], motionRate: 1.08 } },
+  { id: 'qc1', label: 'QC1 检验', shortLabel: 'QC1', stage: 'QC1', position: [-1.8, 0, -2.7], health: 'normal', metric: '状态', metricValue: '正常', issueIds: [], stationCount: 6, visual: { kind: 'inspection-inbound', scale: 1, offset: [0, 0, 0], motionRate: 0.72 } },
+  { id: 'special', label: '特殊工艺', shortLabel: '特殊', stage: '特殊工艺', position: [0.9, 0, 0.2], health: 'warning', metric: '换款等待', metricValue: '96 pcs', issueIds: ['EFF-004', 'IMP-004'], stationCount: 7, visual: { kind: 'special-cell', scale: 0.98, offset: [0, 0, 0], motionRate: 0.66 } },
+  { id: 'qc21', label: 'QC2-1 待检区', shortLabel: 'QC2-1', stage: 'QC2-1', position: [3.6, 0, -2.7], health: 'critical', metric: '延误风险', metricValue: '286 pcs', issueIds: ['EFF-001'], stationCount: 10, visual: { kind: 'inspection-queue', scale: 1, offset: [0, 0, 0], motionRate: 1.16 } },
+  { id: 'finishing', label: '整理作业区', shortLabel: '整理', stage: '整理', position: [6.3, 0, 0.2], health: 'normal', metric: '状态', metricValue: '正常', issueIds: [], stationCount: 8, visual: { kind: 'finishing', scale: 0.98, offset: [0, 0, 0], motionRate: 0.58 } },
+  { id: 'qc22', label: 'QC2-2 终检', shortLabel: 'QC2-2', stage: 'QC2-2', position: [3.6, 0, 3.1], health: 'normal', metric: '状态', metricValue: '正常', issueIds: [], stationCount: 7, visual: { kind: 'inspection-final', scale: 1, offset: [0, 0, 0], motionRate: 0.76 } },
+  { id: 'folding', label: '叠衣作业区', shortLabel: '叠衣', stage: '叠衣', position: [0.9, 0, 3.1], health: 'normal', metric: '状态', metricValue: '正常', issueIds: [], stationCount: 9, visual: { kind: 'folding', scale: 1, offset: [0, 0, 0], motionRate: 0.7 } },
+  { id: 'warehouse', label: '出荷前仓库', shortLabel: '仓库', stage: '出荷前仓库', position: [-1.8, 0, 3.1], health: 'attention', metric: '待放行', metricValue: '64 pcs', issueIds: ['EFF-005'], stationCount: 12, visual: { kind: 'warehouse', scale: 0.96, offset: [0, 0, 0], motionRate: 0.62 } },
 ])
 
 export const issueRelationsRaw = Object.freeze([

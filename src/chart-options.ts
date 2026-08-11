@@ -269,6 +269,17 @@ export function buildFactoryFallbackOption(
     warning: colors.amber,
     critical: colors.danger,
   }
+  const processSymbol = {
+    cutting: 'rect',
+    sewing: 'roundRect',
+    'inspection-inbound': 'diamond',
+    'special-cell': 'circle',
+    'inspection-queue': 'diamond',
+    finishing: 'roundRect',
+    'inspection-final': 'diamond',
+    folding: 'triangle',
+    warehouse: 'rect',
+  } as const
   const nodes = zones.map((zone) => ({
     id: zone.id,
     name: zone.shortLabel,
@@ -276,7 +287,7 @@ export function buildFactoryFallbackOption(
     value: zone.metricValue,
     x: zone.position[0],
     y: zone.position[2],
-    symbol: 'roundRect',
+    symbol: processSymbol[zone.visual.kind],
     symbolSize: selectedId === zone.id ? [96, 54] : [84, 48],
     itemStyle: {
       color: '#11191e',
