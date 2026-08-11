@@ -491,6 +491,21 @@ select:focus-visible {
   overflow: hidden;
 }
 
+.command-center--v21 {
+  --bg: #0b1114;
+  --surface: #121b1f;
+  --surface-2: #182328;
+  --surface-3: #1e2b30;
+  --line: rgba(211, 226, 228, 0.19);
+  --line-strong: rgba(211, 226, 228, 0.34);
+  --muted: #b1bfc1;
+  --dim: #829194;
+}
+
+.command-center--v21 .command-header {
+  background: rgba(12, 18, 21, 0.96);
+}
+
 .command-header {
   position: relative;
   z-index: 30;
@@ -699,7 +714,7 @@ select:focus-visible {
 }
 
 .twin-scene--v21 {
-  background: #070c0f;
+  background: #10191e;
 }
 
 .twin-scene--v21::after {
@@ -768,15 +783,23 @@ select:focus-visible {
   box-shadow: 0 0 0 1px rgba(57, 217, 138, 0.24), 0 14px 34px rgba(0, 0, 0, 0.5);
 }
 
+.twin-scene--v21 .twin-zone-label {
+  background: rgba(15, 23, 27, 0.9);
+}
+
+.twin-scene--v21 .twin-zone-label.is-active {
+  background: rgba(26, 39, 43, 0.98);
+}
+
 .twin-scene--v21 .twin-zone-label.is-state-diagnosing,
 .twin-scene--v21 .twin-zone-label.is-state-improving {
   border-color: rgba(57, 217, 138, 0.72);
-  background: rgba(12, 27, 24, 0.96);
+  background: rgba(17, 38, 33, 0.96);
 }
 
 .twin-scene--v21 .twin-zone-label.is-state-recovered {
   border-left-color: var(--ai);
-  background: rgba(11, 24, 21, 0.92);
+  background: rgba(16, 34, 29, 0.94);
 }
 
 .twin-scene-meta {
@@ -820,6 +843,10 @@ select:focus-visible {
   background: rgba(7, 11, 13, 0.82);
   transform: translateX(-50%);
   pointer-events: none;
+}
+
+.twin-scene--v21 .twin-legend {
+  background: rgba(15, 23, 27, 0.88);
 }
 
 .twin-legend span {
@@ -919,6 +946,14 @@ select:focus-visible {
   background: rgba(10, 15, 18, 0.9);
   box-shadow: var(--shadow);
   backdrop-filter: blur(10px);
+}
+
+.command-center--v21 .narrative-rail,
+.command-center--v21 .decision-rail,
+.command-center--v21 .evidence-rail {
+  border-color: rgba(211, 226, 228, 0.22);
+  background: rgba(16, 24, 28, 0.92);
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.3);
 }
 
 .narrative-rail {
@@ -1246,6 +1281,10 @@ select:focus-visible {
   padding: 8px 14px;
   border-top: 1px solid var(--line-strong);
   background: rgba(7, 10, 12, 0.98);
+}
+
+.command-center--v21 .story-dock {
+  background: rgba(11, 17, 20, 0.98);
 }
 
 .story-status {

@@ -139,20 +139,20 @@ function displayMetric(zone: FactoryZone) {
 function createFloor(targetScene: THREE.Scene) {
   const floor = new THREE.Mesh(
     new THREE.PlaneGeometry(25, 15.6),
-    new THREE.MeshStandardMaterial({ color: 0x0a1013, roughness: 0.94, metalness: 0.08 }),
+    new THREE.MeshStandardMaterial({ color: 0x182529, roughness: 0.94, metalness: 0.08 }),
   )
   floor.rotation.x = -Math.PI / 2
   floor.position.y = -0.18
   floor.receiveShadow = !isMobile
   targetScene.add(floor)
 
-  const grid = new THREE.GridHelper(25, 50, 0x24534e, 0x17262a)
+  const grid = new THREE.GridHelper(25, 50, 0x3a716a, 0x294147)
   grid.scale.z = 0.62
   grid.position.y = -0.165
   const gridMaterials = Array.isArray(grid.material) ? grid.material : [grid.material]
   gridMaterials.forEach((material) => {
     material.transparent = true
-    material.opacity = 0.34
+    material.opacity = 0.4
   })
   targetScene.add(grid)
 
@@ -167,7 +167,7 @@ function createZone(zone: FactoryZone) {
   const [width, depth] = zone.model.footprint
   const baseMaterial = industrialKit.animatedMaterial('graphite')
   const deckMaterial = industrialKit.animatedMaterial(zone.model.materialFamily === 'inspection' ? 'metal' : 'graphite')
-  deckMaterial.color.setHex(zone.health === 'critical' ? 0x29191b : zone.health === 'warning' ? 0x282317 : 0x112026)
+  deckMaterial.color.setHex(zone.health === 'critical' ? 0x462426 : zone.health === 'warning' ? 0x40351e : 0x18322c)
   deckMaterial.emissive.setHex(accent)
   deckMaterial.emissiveIntensity = zone.health === 'critical' ? 0.16 : 0.06
   zoneMaterials.set(zone.id, [baseMaterial, deckMaterial])
@@ -702,8 +702,8 @@ async function initializeScene() {
       kitDisposed = false
     }
     scene = new THREE.Scene()
-    scene.background = new THREE.Color(0x070c0f)
-    scene.fog = new THREE.FogExp2(0x070c0f, 0.031)
+    scene.background = new THREE.Color(0x10191e)
+    scene.fog = new THREE.FogExp2(0x10191e, 0.026)
     camera = new THREE.PerspectiveCamera(35, 1, 0.1, 100)
     camera.position.set(...props.camera.position)
     camera.layers.enable(BLOOM_LAYER)
@@ -718,7 +718,7 @@ async function initializeScene() {
     renderer.info.autoReset = false
     renderer.outputColorSpace = THREE.SRGBColorSpace
     renderer.toneMapping = THREE.ACESFilmicToneMapping
-    renderer.toneMappingExposure = 0.94
+    renderer.toneMappingExposure = 1.1
     // Procedural contact shadows preserve depth without a full extra shadow-map render.
     renderer.shadowMap.enabled = false
 
@@ -738,14 +738,17 @@ async function initializeScene() {
     canvasEl.value.addEventListener('pointerdown', handlePointerDown)
     canvasEl.value.addEventListener('pointerup', handlePointerUp)
 
-    scene.add(new THREE.HemisphereLight(0xc7dde0, 0x061012, 1.24))
-    const keyLight = new THREE.DirectionalLight(0xf1fbff, 2.8)
+    scene.add(new THREE.HemisphereLight(0xd9e9ea, 0x102326, 1.65))
+    const keyLight = new THREE.DirectionalLight(0xf4fbfc, 3.2)
     keyLight.position.set(5, 14, 8)
     keyLight.castShadow = false
     scene.add(keyLight)
-    const rimLight = new THREE.DirectionalLight(0x59cbe8, 1.1)
+    const rimLight = new THREE.DirectionalLight(0x68d5ee, 1.45)
     rimLight.position.set(-9, 6, -8)
     scene.add(rimLight)
+    const fillLight = new THREE.DirectionalLight(0xcfe4e6, 1.25)
+    fillLight.position.set(-1, 7, 12)
+    scene.add(fillLight)
     const accentLight = new THREE.PointLight(0x39d98a, 18, 20, 1.8)
     accentLight.position.set(-1.5, 4.6, 0.5)
     scene.add(accentLight)

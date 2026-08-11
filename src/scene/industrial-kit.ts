@@ -20,12 +20,12 @@ export interface IndustrialKit {
 }
 
 const palette: Record<IndustrialMaterialFamily, { color: number; roughness: number; metalness: number; opacity?: number }> = {
-  graphite: { color: 0x121b1f, roughness: 0.72, metalness: 0.34 },
-  metal: { color: 0x668087, roughness: 0.34, metalness: 0.72 },
-  pearl: { color: 0xc7d4d6, roughness: 0.3, metalness: 0.42 },
-  rubber: { color: 0x11181b, roughness: 0.94, metalness: 0.06 },
-  fabric: { color: 0xcbd8d8, roughness: 0.88, metalness: 0.02 },
-  glass: { color: 0x72d8e8, roughness: 0.18, metalness: 0.08, opacity: 0.2 },
+  graphite: { color: 0x1c292d, roughness: 0.72, metalness: 0.34 },
+  metal: { color: 0x78949a, roughness: 0.34, metalness: 0.72 },
+  pearl: { color: 0xd8e3e4, roughness: 0.3, metalness: 0.42 },
+  rubber: { color: 0x182225, roughness: 0.94, metalness: 0.06 },
+  fabric: { color: 0xdfe8e8, roughness: 0.88, metalness: 0.02 },
+  glass: { color: 0x82ddeb, roughness: 0.18, metalness: 0.08, opacity: 0.24 },
   accent: { color: 0x39d98a, roughness: 0.26, metalness: 0.2 },
   warning: { color: 0xe6ad4e, roughness: 0.34, metalness: 0.22 },
   critical: { color: 0xe66b64, roughness: 0.34, metalness: 0.18 },

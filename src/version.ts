@@ -62,6 +62,13 @@ export const versionHistory: readonly VersionRelease[] = [
         title: '新增镜头导演与选择性辉光',
         description: '引导模式采用曲线路径与自动取景，大屏只对AI路径和当前节点使用选择性辉光。',
       },
+      {
+        id: 'v21-scene-readability',
+        changedAt: '2026-08-11',
+        category: '视觉可读性',
+        title: '提升深色场景的设备辨识度',
+        description: '提升环境补光、工业材质、地坪网格与信息轨道对比度，同时保留异常状态色和选择性辉光层级。',
+      },
     ],
   },
   {

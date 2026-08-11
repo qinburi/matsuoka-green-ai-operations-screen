@@ -387,7 +387,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <main class="command-center" :class="{ 'has-evidence': evidenceRailVisible }">
+  <main class="command-center" :class="{ 'has-evidence': evidenceRailVisible, 'command-center--v21': isV21 }">
     <header class="command-header">
       <div class="command-brand">
         <button type="button" class="back-command" @click="backToOverview">返回大屏</button>
