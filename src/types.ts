@@ -5,6 +5,8 @@ export type ExperienceMode = 'guided' | 'explore'
 export type ZoneHealth = 'normal' | 'attention' | 'warning' | 'critical'
 export type RelationType = 'fact' | 'correlation' | 'ai-hypothesis' | 'confirmed-cause'
 export type ConfirmationState = 'confirmed' | 'pending'
+export type ProcessAnimationState = 'ambient' | 'warning' | 'selected' | 'diagnosing' | 'improving' | 'recovered'
+export type AiAnalysisStage = 'idle' | 'scan' | 'lock' | 'evidence' | 'hypothesis' | 'solution' | 'responsibility'
 export type ProcessVisualKind =
   | 'cutting'
   | 'sewing'
@@ -107,6 +109,49 @@ export interface CameraPreset {
   duration: number
 }
 
+export interface CameraShot extends CameraPreset {
+  framing: 'overview' | 'zone' | 'relationship'
+  pathLift: number
+}
+
+export interface ProcessRuntimeState {
+  throughputRate: number
+  capacityPerHour: number
+  wip: number
+  queue: number
+  starvationRate: number
+  severity: number
+}
+
+export interface ProcessPort {
+  position: [number, number, number]
+  direction: [number, number, number]
+}
+
+export interface ProcessModelProfile {
+  footprint: [number, number]
+  elevation: number
+  materialFamily: 'production' | 'inspection' | 'logistics'
+  desktopDetail: number
+  mobileDetail: number
+}
+
+export interface ProductionFlowSnapshot {
+  throughputScale: number
+  queueScale: number
+  starvationScale: number
+  bottleneckZoneId: string | null
+}
+
+export interface ImprovementSnapshot {
+  status: 'inactive' | 'simulation' | 'recovered'
+  queueBefore: number
+  queueAfter: number
+  completionBefore: number
+  completionAfter: number
+  disclaimer: string
+}
+
 export interface ProcessNodeVisual {
   kind: ProcessVisualKind
   scale: number
@@ -126,6 +171,10 @@ export interface FactoryZone {
   issueIds: string[]
   stationCount: number
   visual: ProcessNodeVisual
+  inputPort: ProcessPort
+  outputPort: ProcessPort
+  runtime: ProcessRuntimeState
+  model: ProcessModelProfile
 }
 
 export interface SceneNode {
@@ -156,8 +205,11 @@ export interface DemoChapter {
   narrative: string
   focusZoneId: string | null
   focusIssueId: string | null
-  camera: CameraPreset
+  camera: CameraShot
   evidenceMode: 'hidden' | 'metrics' | 'relationship' | 'actions' | 'summary'
+  aiStage: AiAnalysisStage
+  flow: ProductionFlowSnapshot
+  improvement: ImprovementSnapshot
 }
 
 export interface DemoScenario {

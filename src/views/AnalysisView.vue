@@ -3,17 +3,26 @@ import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import EChart from '../components/EChart.vue'
 import FactoryTwinScene from '../components/FactoryTwinScene.vue'
+import FactoryTwinSceneV21 from '../components/FactoryTwinSceneV21.vue'
 import VersionDialog from '../components/VersionDialog.vue'
 import { buildRankingOption, buildTrendOption } from '../chart-options'
 import { contextOptions, defaultContext, sourceLabels, stateLabels, topics } from '../data/demo'
 import { demoScenario, factoryZones, issueRelations, zoneById } from '../data/factory-scene'
-import type { CameraPreset, DataState, ExperienceMode, Issue, TopicId } from '../types'
+import type { AiAnalysisStage, CameraShot, DataState, ExperienceMode, Issue, ProcessAnimationState, TopicId } from '../types'
 
 const route = useRoute()
 const router = useRouter()
 const topicIds: TopicId[] = ['efficiency', 'quality', 'improvement']
 const allIssues = Object.values(topics).flatMap((dataset) => dataset.issues)
 const issueById = new Map(allIssues.map((issue) => [issue.id, issue]))
+const aiStages: { id: AiAnalysisStage; label: string }[] = [
+  { id: 'scan', label: '扫描' },
+  { id: 'lock', label: '锁定' },
+  { id: 'evidence', label: '证据' },
+  { id: 'hypothesis', label: '假设' },
+  { id: 'solution', label: '措施' },
+  { id: 'responsibility', label: '责任' },
+]
 
 const initialTopic = topicIds.includes(route.query.topic as TopicId)
   ? route.query.topic as TopicId
@@ -49,6 +58,7 @@ const analysisTimers: number[] = []
 
 const currentDataset = computed(() => topics[currentTopicId.value])
 const currentChapter = computed(() => demoScenario.chapters[currentChapterIndex.value])
+const isV21 = computed(() => route.meta.uiVersion === 'v2.1.0')
 const sourceLabel = computed(() => sourceLabels[context.source] ?? '综合入口')
 const displayData = computed(() => dataState.value === 'normal' || dataState.value === 'stale')
 const sceneState = computed<DataState | 'loading'>(() => analyzing.value ? 'loading' : dataState.value)
@@ -85,6 +95,43 @@ const activeRelation = computed(() => {
 })
 
 const storyProgress = computed(() => Math.min(100, elapsedSeconds.value / demoScenario.totalDuration * 100))
+const chapterProgress = computed(() => {
+  const start = chapterStart(currentChapterIndex.value)
+  return Math.max(0, Math.min(1, (elapsedSeconds.value - start) / currentChapter.value.duration))
+})
+const improvementProgress = computed(() => {
+  if (currentChapter.value.improvement.status === 'simulation') return chapterProgress.value
+  if (currentChapter.value.improvement.status === 'recovered') return 1
+  return 0
+})
+const activeAiStageIndex = computed(() => aiStages.findIndex((stage) => stage.id === currentChapter.value.aiStage))
+const zoneStates = computed<Record<string, ProcessAnimationState>>(() => {
+  const result = Object.fromEntries(factoryZones.map((zone) => [
+    zone.id,
+    zone.health === 'critical' || zone.health === 'warning' ? 'warning' : 'ambient',
+  ])) as Record<string, ProcessAnimationState>
+  if (!displayData.value) return Object.fromEntries(factoryZones.map((zone) => [zone.id, 'ambient'])) as Record<string, ProcessAnimationState>
+  const chapterId = currentChapter.value.id
+  if (chapterId === 'qc21') {
+    result.qc21 = 'diagnosing'
+    result.sewing = 'warning'
+    result.finishing = 'warning'
+  } else if (chapterId === 'sewing' || chapterId === 'explain') {
+    result.sewing = 'diagnosing'
+    result.qc21 = 'warning'
+    result.finishing = 'warning'
+  } else if (chapterId === 'actions') {
+    result.qc21 = 'improving'
+    result.sewing = 'improving'
+    result.finishing = 'improving'
+  } else if (chapterId === 'summary') {
+    result.qc21 = 'recovered'
+    result.sewing = 'recovered'
+    result.finishing = 'recovered'
+  }
+  if (experienceMode.value === 'explore' && activeZoneId.value) result[activeZoneId.value] = 'selected'
+  return result
+})
 const evidenceRailVisible = computed(() => (
   evidencePinned.value
   || ['relationship', 'actions'].includes(currentChapter.value.evidenceMode)
@@ -153,11 +200,11 @@ const responsibility = computed(() => activeIssue.value?.responsibility ?? {
   confirmation: '建议关联，待客户确认',
 })
 
-const cameraPreset = computed<CameraPreset>(() => {
+const cameraPreset = computed<CameraShot>(() => {
   if (experienceMode.value === 'guided' && !selectedZoneId.value) return currentChapter.value.camera
   if (activeZone.value) {
     const [x, , z] = activeZone.value.position
-    return { position: [x + 5.6, 6.8, z + 7.4], target: [x, 0.35, z], duration: 920 }
+    return { position: [x + 5.6, 6.8, z + 7.4], target: [x, 0.35, z], duration: 920, framing: 'zone', pathLift: 1.8 }
   }
   return demoScenario.chapters[1].camera
 })
@@ -187,8 +234,9 @@ function storyLoop(now: number) {
 }
 
 function updateRoute() {
+  const routeName = route.meta.uiVersion === 'v2.0.0' ? 'v2-analysis' : 'analysis'
   router.replace({
-    name: 'analysis',
+    name: routeName,
     query: {
       topic: currentTopicId.value,
       source: context.source,
@@ -202,6 +250,10 @@ function updateRoute() {
 
 function pauseForInteraction() {
   playing.value = false
+}
+
+function backToOverview() {
+  router.push({ name: route.meta.uiVersion === 'v2.0.0' ? 'v2-overview' : 'overview' })
 }
 
 function selectZone(zoneId: string) {
@@ -314,6 +366,8 @@ watch(() => route.query, (query) => {
     elapsedSeconds.value = 0
     playing.value = true
   } else if (query.mode === 'explore' && experienceMode.value !== 'explore') {
+    currentChapterIndex.value = 1
+    elapsedSeconds.value = 8
     playing.value = false
   }
   if (query.mode === 'guided' || query.mode === 'explore') experienceMode.value = query.mode
@@ -336,7 +390,7 @@ onBeforeUnmount(() => {
   <main class="command-center" :class="{ 'has-evidence': evidenceRailVisible }">
     <header class="command-header">
       <div class="command-brand">
-        <button type="button" class="back-command" @click="router.push('/')">返回大屏</button>
+        <button type="button" class="back-command" @click="backToOverview">返回大屏</button>
         <span class="brand-rule" />
         <div>
           <span>MATSUOKA · GREEN AI</span>
@@ -379,7 +433,24 @@ onBeforeUnmount(() => {
     </Transition>
 
     <section class="command-stage">
+      <FactoryTwinSceneV21
+        v-if="isV21"
+        :zones="factoryZones"
+        :active-zone-id="activeZoneId"
+        :camera="cameraPreset"
+        :data-state="sceneState"
+        :zone-states="zoneStates"
+        :ai-stage="currentChapter.aiStage"
+        :chapter-progress="chapterProgress"
+        :flow-snapshot="currentChapter.flow"
+        :improvement-progress="improvementProgress"
+        :force-fallback="route.query.renderer === '2d'"
+        @select-zone="selectZone"
+        @manual-interaction="pauseForInteraction"
+        @render-state="sceneRenderer = $event"
+      />
       <FactoryTwinScene
+        v-else
         :zones="factoryZones"
         :active-zone-id="activeZoneId"
         :camera="cameraPreset"
@@ -415,6 +486,21 @@ onBeforeUnmount(() => {
               <span>0{{ index + 1 }}</span>{{ label }}
             </li>
           </ol>
+        </div>
+
+        <div v-if="isV21" class="ai-reasoning-sequence" :class="`is-${currentChapter.aiStage}`">
+          <header><span>AI ANALYSIS CHAIN</span><strong>{{ currentChapter.aiStage === 'idle' ? '生产态势监测' : '可解释分析推进' }}</strong></header>
+          <ol>
+            <li
+              v-for="(stage, index) in aiStages"
+              :key="stage.id"
+              :class="{ 'is-active': currentChapter.aiStage === stage.id, 'is-past': activeAiStageIndex > index }"
+            >
+              <i />
+              <span>{{ stage.label }}</span>
+            </li>
+          </ol>
+          <small>事实、相关性、AI假设与待确认项分层展示</small>
         </div>
 
         <div class="mobile-zone-jump" aria-label="工序快速选择">
@@ -453,6 +539,21 @@ onBeforeUnmount(() => {
           <header><span>{{ activeRelation.label }}</span><strong>{{ Math.round(activeRelation.confidence * 100) }}%</strong></header>
           <p>{{ activeRelation.evidence.join('；') }}</p>
           <small>未经现场数据验证，不视为已确认因果。</small>
+        </div>
+
+        <div v-if="isV21 && improvementProgress > 0 && displayData" class="decision-simulation">
+          <header><span>IMPROVEMENT SIMULATION</span><strong>{{ currentChapter.improvement.status === 'recovered' ? '模拟恢复态' : '措施生效演示' }}</strong></header>
+          <div>
+            <span>QC2-1待检</span>
+            <strong>{{ Math.round(currentChapter.improvement.queueBefore - (currentChapter.improvement.queueBefore - currentChapter.improvement.queueAfter) * improvementProgress) }} pcs</strong>
+            <i><b :style="{ width: `${100 - improvementProgress * 55}%` }" /></i>
+          </div>
+          <div>
+            <span>计划达成率</span>
+            <strong>{{ (currentChapter.improvement.completionBefore + (currentChapter.improvement.completionAfter - currentChapter.improvement.completionBefore) * improvementProgress).toFixed(1) }}%</strong>
+            <i><b class="is-positive" :style="{ width: `${75 + improvementProgress * 20}%` }" /></i>
+          </div>
+          <small>{{ currentChapter.improvement.disclaimer }}</small>
         </div>
 
         <div class="decision-boundary">

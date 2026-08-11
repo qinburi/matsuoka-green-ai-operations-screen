@@ -1,15 +1,16 @@
 <script setup lang="ts">
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import VersionDialog from '../components/VersionDialog.vue'
 import { entryContexts } from '../data/demo'
 
 const router = useRouter()
+const route = useRoute()
 const factoryBackdropUrl = `${import.meta.env.BASE_URL}assets/factory-operations-center.png`
 
 function enter(entry: keyof typeof entryContexts) {
   const context = entryContexts[entry]
   router.push({
-    name: 'analysis',
+    name: route.meta.uiVersion === 'v2.0.0' ? 'v2-analysis' : 'analysis',
     query: {
       topic: context.topic,
       source: context.source,

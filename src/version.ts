@@ -19,16 +19,57 @@ export interface VersionRelease {
   changes: readonly VersionChange[]
 }
 
-export const CURRENT_PRODUCT_VERSION = 'v2.0.0'
+export const CURRENT_PRODUCT_VERSION = 'v2.1.0'
 
 // Future versions are added here manually together with their routes and append-only changes.
 export const versionHistory: readonly VersionRelease[] = [
   {
+    version: 'v2.1.0',
+    releasedAt: '2026-08-11',
+    title: 'AI工业微缩工厂',
+    status: 'current',
+    prototypeRoutes: { overview: 'overview', analysis: 'analysis' },
+    highlights: [
+      '将九类工序岛升级为具有独立机构、物料接口和物流方向的程序化工业模型。',
+      '新增业务状态驱动的语义物流、瓶颈传播、AI诊断链和改善恢复模拟。',
+      '新增曲线路径镜头导演、选中节点自动取景和大屏选择性辉光。',
+      '完整保留V2.0.0与V1.0.0历史产品原型并支持直接切换。',
+    ],
+    boundaries: [
+      '三维场景和改善结果均为演示模拟，不代表松冈真实设备、厂区或生产预测。',
+      '瓶颈传播仅表达同期关联与AI假设，必须由现场数据和人员复核。',
+      '未连接真实生产接口、CPU小模型服务、任务分派或消息闭环。',
+    ],
+    changes: [
+      {
+        id: 'v21-semantic-motion',
+        changedAt: '2026-08-11',
+        category: '业务动效',
+        title: '以业务状态驱动三维生产态势',
+        description: '新增语义物流、队列堆积、下游等料、AI诊断阶段和改善恢复模拟。',
+      },
+      {
+        id: 'v21-industrial-models',
+        changedAt: '2026-08-11',
+        category: '工业建模',
+        title: '升级九类程序化工序模型',
+        description: '使用共享工业组件、独立工序轮廓和明确输入输出接口增强识别度。',
+      },
+      {
+        id: 'v21-cinematic-rendering',
+        changedAt: '2026-08-11',
+        category: '镜头与画质',
+        title: '新增镜头导演与选择性辉光',
+        description: '引导模式采用曲线路径与自动取景，大屏只对AI路径和当前节点使用选择性辉光。',
+      },
+    ],
+  },
+  {
     version: 'v2.0.0',
     releasedAt: '2026-08-11',
     title: '三维生产指挥舱',
-    status: 'current',
-    prototypeRoutes: { overview: 'overview', analysis: 'analysis' },
+    status: 'archived',
+    prototypeRoutes: { overview: 'v2-overview', analysis: 'v2-analysis' },
     highlights: [
       '新增九类纯 Three.js 程序化未来微缩工厂节点，支持工序聚焦、旋转、缩放和机构动画。',
       '新增90秒效率与质量联动演示，支持暂停、跳转、重播和自由探索。',

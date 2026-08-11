@@ -56,19 +56,24 @@ test('当前产品版本与package版本一致且保留完整版本配置', () =
   const configuredVersion = versionSource.match(/CURRENT_PRODUCT_VERSION = '(v[^']+)'/)?.[1]
 
   assert.equal(configuredVersion, `v${packageJson.version}`)
+  assert.match(versionSource, /version: 'v2\.1\.0'/)
   assert.match(versionSource, /version: 'v2\.0\.0'/)
   assert.match(versionSource, /version: 'v1\.0\.0'/)
   assert.match(versionSource, /prototypeRoutes: \{ overview: 'overview', analysis: 'analysis' \}/)
+  assert.match(versionSource, /prototypeRoutes: \{ overview: 'v2-overview', analysis: 'v2-analysis' \}/)
   assert.match(versionSource, /prototypeRoutes: \{ overview: 'v1-overview', analysis: 'v1-analysis' \}/)
   assert.match(versionSource, /id: 'v1-launch'/)
   assert.match(versionSource, /id: 'v2-command-center'/)
+  assert.match(versionSource, /id: 'v21-semantic-motion'/)
 })
 
-test('四条版本路由具有明确页面类型和版本元数据', () => {
+test('六条版本路由具有明确页面类型和版本元数据', () => {
   const routerSource = readProjectFile('src/router.ts')
 
   assert.match(routerSource, /path: '\/', name: 'overview'.*uiVersion: CURRENT_PRODUCT_VERSION, viewKind: 'overview'/)
   assert.match(routerSource, /path: '\/analysis', name: 'analysis'.*uiVersion: CURRENT_PRODUCT_VERSION, viewKind: 'analysis'/)
+  assert.match(routerSource, /path: '\/v2\/', alias: '\/v2', name: 'v2-overview'.*uiVersion: 'v2\.0\.0', viewKind: 'overview'/)
+  assert.match(routerSource, /path: '\/v2\/analysis', name: 'v2-analysis'.*uiVersion: 'v2\.0\.0', viewKind: 'analysis'/)
   assert.match(routerSource, /path: '\/v1\/', alias: '\/v1', name: 'v1-overview'.*uiVersion: 'v1\.0\.0', viewKind: 'overview'/)
   assert.match(routerSource, /path: '\/v1\/analysis', name: 'v1-analysis'.*uiVersion: 'v1\.0\.0', viewKind: 'analysis'/)
 })
@@ -107,10 +112,54 @@ test('抽象数字孪生覆盖九个工序并可追溯到问题', () => {
     assert.ok(zone.visual.scale > 0)
     assert.ok(zone.visual.motionRate > 0)
     assert.equal(zone.visual.offset.length, 3)
+    assert.equal(zone.inputPort.position.length, 3)
+    assert.equal(zone.outputPort.position.length, 3)
+    assert.ok(zone.runtime.throughputRate > 0 && zone.runtime.throughputRate <= 1)
+    assert.ok(zone.runtime.capacityPerHour > 0)
+    assert.ok(zone.runtime.wip >= 0)
+    assert.ok(zone.runtime.queue >= 0)
+    assert.ok(zone.model.footprint.every((value) => value > 0))
+    assert.ok(zone.model.desktopDetail >= zone.model.mobileDetail)
     visualKinds.add(zone.visual.kind)
     for (const issueId of zone.issueIds) assert.ok(issueIds.has(issueId), `${zone.id} references missing issue ${issueId}`)
   }
   assert.equal(visualKinds.size, 9)
+})
+
+test('V2.1使用独立语义三维场景且V2.0继续加载原场景', () => {
+  const analysisSource = readProjectFile('src/views/AnalysisView.vue')
+  const v21SceneSource = readProjectFile('src/components/FactoryTwinSceneV21.vue')
+
+  assert.match(analysisSource, /v-if="isV21"/)
+  assert.match(analysisSource, /<FactoryTwinSceneV21/)
+  assert.match(analysisSource, /<FactoryTwinScene\s+v-else/)
+  assert.match(analysisSource, /route\.meta\.uiVersion === 'v2\.0\.0' \? 'v2-analysis' : 'analysis'/)
+  assert.match(analysisSource, /route\.meta\.uiVersion === 'v2\.0\.0' \? 'v2-overview' : 'overview'/)
+  assert.match(analysisSource, /currentChapterIndex\.value = 1/)
+  assert.match(v21SceneSource, /UnrealBloomPass/)
+  assert.match(v21SceneSource, /CatmullRomCurve3/)
+  assert.match(v21SceneSource, /InstancedMesh/)
+  assert.match(v21SceneSource, /document\.visibilityState/)
+  assert.match(v21SceneSource, /window\.addEventListener\('resize', handleViewportChange\)/)
+  assert.match(v21SceneSource, /bloomPass\?\.dispose\(\)/)
+  assert.doesNotMatch(v21SceneSource, /TextureLoader|CanvasTexture|\.webp|\.png|\.jpe?g/)
+})
+
+test('V2.1工序动画由六态状态机和AI阶段驱动', () => {
+  const typeSource = readProjectFile('src/types.ts')
+  const islandSource = readProjectFile('src/scene/process-islands-v21.ts')
+  const sceneSource = readProjectFile('src/components/FactoryTwinSceneV21.vue')
+
+  for (const state of ['ambient', 'warning', 'selected', 'diagnosing', 'improving', 'recovered']) {
+    assert.match(typeSource, new RegExp(`'${state}'`))
+  }
+  for (const stage of ['scan', 'lock', 'evidence', 'hypothesis', 'solution', 'responsibility']) {
+    assert.match(typeSource, new RegExp(`'${stage}'`))
+  }
+  assert.match(islandSource, /improvementProgress/)
+  assert.match(islandSource, /queueFactor/)
+  assert.match(sceneSource, /flowSnapshot/)
+  assert.match(sceneSource, /updateAiLayer/)
 })
 
 test('工序岛由Three.js程序化几何构成且不依赖位图资产', () => {
@@ -130,8 +179,16 @@ test('90秒演示章节、镜头与业务聚焦完整', () => {
     assert.equal(chapter.order, index + 1)
     assert.equal(chapter.camera.position.length, 3)
     assert.equal(chapter.camera.target.length, 3)
+    assert.match(chapter.camera.framing, /^(overview|zone|relationship)$/)
+    assert.ok(chapter.camera.pathLift > 0)
+    assert.match(chapter.aiStage, /^(idle|scan|lock|evidence|hypothesis|solution|responsibility)$/)
+    assert.ok(chapter.flow.throughputScale > 0)
+    assert.match(chapter.improvement.status, /^(inactive|simulation|recovered)$/)
+    assert.match(chapter.improvement.disclaimer, /演示/)
     if (chapter.focusZoneId) assert.ok(factoryZonesRaw.some((zone) => zone.id === chapter.focusZoneId))
   }
+  assert.equal(demoScenarioRaw.chapters.find((chapter) => chapter.id === 'actions').improvement.status, 'simulation')
+  assert.equal(demoScenarioRaw.chapters.find((chapter) => chapter.id === 'summary').improvement.status, 'recovered')
 })
 
 test('效率与质量联动只标记相关或AI假设', () => {
