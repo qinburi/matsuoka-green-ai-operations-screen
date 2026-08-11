@@ -19,15 +19,16 @@ function standardMaterial(
   emissiveIntensity = 0,
   options: { transparent?: boolean; opacity?: number; roughness?: number; metalness?: number } = {},
 ) {
-  return new THREE.MeshStandardMaterial({
+  const parameters: THREE.MeshStandardMaterialParameters = {
     color,
     emissive,
     emissiveIntensity,
-    transparent: options.transparent,
-    opacity: options.opacity,
     roughness: options.roughness ?? 0.42,
     metalness: options.metalness ?? 0.5,
-  })
+  }
+  if (options.transparent !== undefined) parameters.transparent = options.transparent
+  if (options.opacity !== undefined) parameters.opacity = options.opacity
+  return new THREE.MeshStandardMaterial(parameters)
 }
 
 function addBox(

@@ -397,7 +397,7 @@ async function initializeScene() {
     renderer.toneMapping = THREE.ACESFilmicToneMapping
     renderer.toneMappingExposure = 0.92
     renderer.shadowMap.enabled = window.innerWidth > 760
-    renderer.shadowMap.type = THREE.PCFSoftShadowMap
+    renderer.shadowMap.type = THREE.PCFShadowMap
 
     controls = new OrbitControls(camera, canvasEl.value)
     controls.target.set(...props.camera.target)

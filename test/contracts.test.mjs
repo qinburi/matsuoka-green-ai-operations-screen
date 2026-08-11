@@ -50,18 +50,49 @@ test('所有指标与证据来源都明确标识为演示', () => {
   }
 })
 
-test('v2.0.0版本入口由项目版本驱动并保留v1历史', () => {
+test('当前产品版本与package版本一致且保留完整版本配置', () => {
   const packageJson = JSON.parse(readProjectFile('package.json'))
   const versionSource = readProjectFile('src/version.ts')
-  const overviewSource = readProjectFile('src/views/OverviewView.vue')
-  const analysisSource = readProjectFile('src/views/AnalysisView.vue')
+  const configuredVersion = versionSource.match(/CURRENT_PRODUCT_VERSION = '(v[^']+)'/)?.[1]
 
-  assert.equal(packageJson.version, '2.0.0')
-  assert.match(versionSource, /v\$\{__APP_VERSION__\}/)
+  assert.equal(configuredVersion, `v${packageJson.version}`)
+  assert.match(versionSource, /version: 'v2\.0\.0'/)
   assert.match(versionSource, /version: 'v1\.0\.0'/)
+  assert.match(versionSource, /prototypeRoutes: \{ overview: 'overview', analysis: 'analysis' \}/)
+  assert.match(versionSource, /prototypeRoutes: \{ overview: 'v1-overview', analysis: 'v1-analysis' \}/)
+  assert.match(versionSource, /id: 'v1-launch'/)
+  assert.match(versionSource, /id: 'v2-command-center'/)
+})
+
+test('四条版本路由具有明确页面类型和版本元数据', () => {
+  const routerSource = readProjectFile('src/router.ts')
+
+  assert.match(routerSource, /path: '\/', name: 'overview'.*uiVersion: CURRENT_PRODUCT_VERSION, viewKind: 'overview'/)
+  assert.match(routerSource, /path: '\/analysis', name: 'analysis'.*uiVersion: CURRENT_PRODUCT_VERSION, viewKind: 'analysis'/)
+  assert.match(routerSource, /path: '\/v1\/', alias: '\/v1', name: 'v1-overview'.*uiVersion: 'v1\.0\.0', viewKind: 'overview'/)
+  assert.match(routerSource, /path: '\/v1\/analysis', name: 'v1-analysis'.*uiVersion: 'v1\.0\.0', viewKind: 'analysis'/)
+})
+
+test('版本卡片直接切换同类页面并保留查询上下文', () => {
+  const dialogSource = readProjectFile('src/components/VersionDialog.vue')
+
+  assert.match(dialogSource, /release\.prototypeRoutes\[viewKind\]/)
+  assert.match(dialogSource, /router\.push\(\{ name: targetName, query: \{ \.\.\.route\.query \} \}\)/)
+  assert.match(dialogSource, /@click="openVersion\(release\)"/)
+  assert.doesNotMatch(dialogSource, /进入此版本/)
+})
+
+test('v1历史原型使用独立命名空间且不加载Three.js指挥舱', () => {
+  const overviewSource = readProjectFile('src/legacy/v1/V1OverviewView.vue')
+  const analysisSource = readProjectFile('src/legacy/v1/V1AnalysisView.vue')
+  const legacyStyles = readProjectFile('src/legacy/v1/v1.css')
+
   assert.match(overviewSource, /import\.meta\.env\.BASE_URL/)
-  assert.match(overviewSource, /<VersionDialog \/>/)
+  assert.match(overviewSource, /data-ui-version="v1\.0\.0"/)
+  assert.match(analysisSource, /data-ui-version="v1\.0\.0"/)
   assert.match(analysisSource, /<VersionDialog \/>/)
+  assert.match(legacyStyles, /\.legacy-v1-root/)
+  assert.doesNotMatch(`${overviewSource}\n${analysisSource}`, /FactoryTwinScene|from ['"]three['"]|Three\.js/)
 })
 
 test('抽象数字孪生覆盖九个工序并可追溯到问题', () => {
