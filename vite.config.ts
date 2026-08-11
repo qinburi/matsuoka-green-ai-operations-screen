@@ -14,5 +14,14 @@ export default defineConfig({
   },
   build: {
     chunkSizeWarningLimit: 700,
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (id.includes('/node_modules/three/')) return 'three'
+          if (id.includes('/node_modules/echarts/') || id.includes('/node_modules/zrender/')) return 'echarts'
+          if (id.includes('/node_modules/vue/') || id.includes('/node_modules/vue-router/')) return 'vue'
+        },
+      },
+    },
   },
 })

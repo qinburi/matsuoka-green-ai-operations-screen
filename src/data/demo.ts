@@ -1,4 +1,4 @@
-import type { AnalysisContext, TopicDataset, TopicId } from '../types'
+import type { AnalysisContext, ExperienceMode, TopicDataset, TopicId } from '../types'
 import { demoContextOptions, hotspotContexts, rawTopics } from './demo-raw.mjs'
 
 export const topics = rawTopics as Record<TopicId, TopicDataset>
@@ -8,7 +8,13 @@ export const contextOptions = demoContextOptions as {
   periods: string[]
   contracts: string[]
 }
-export const entryContexts = hotspotContexts as Record<string, { topic: TopicId; source: string }>
+export const entryContexts = hotspotContexts as Record<string, {
+  topic: TopicId
+  source: string
+  mode: ExperienceMode
+  scenario: string
+  focus: string
+}>
 
 export const defaultContext: AnalysisContext = {
   factory: contextOptions.factories[0],

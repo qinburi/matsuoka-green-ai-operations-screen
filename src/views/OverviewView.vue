@@ -4,12 +4,19 @@ import VersionDialog from '../components/VersionDialog.vue'
 import { entryContexts } from '../data/demo'
 
 const router = useRouter()
+const factoryBackdropUrl = `${import.meta.env.BASE_URL}assets/factory-operations-center.png`
 
 function enter(entry: keyof typeof entryContexts) {
   const context = entryContexts[entry]
   router.push({
     name: 'analysis',
-    query: { topic: context.topic, source: context.source },
+    query: {
+      topic: context.topic,
+      source: context.source,
+      mode: context.mode,
+      scenario: context.scenario,
+      focus: context.focus || undefined,
+    },
   })
 }
 </script>
@@ -19,7 +26,7 @@ function enter(entry: keyof typeof entryContexts) {
     <section class="screen-stage" aria-label="松冈工厂数字化运营中心">
       <img
         class="screen-backdrop"
-        src="/assets/factory-operations-center.png"
+        :src="factoryBackdropUrl"
         alt="松冈工厂数字化运营中心现有大屏"
       />
 

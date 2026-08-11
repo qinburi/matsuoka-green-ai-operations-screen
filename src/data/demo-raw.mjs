@@ -1,8 +1,8 @@
 export const hotspotContexts = Object.freeze({
-  overview: { topic: 'efficiency', source: 'green-ai-entry' },
-  production: { topic: 'efficiency', source: 'production-performance' },
-  defects: { topic: 'quality', source: 'defect-top5' },
-  progress: { topic: 'efficiency', source: 'process-progress' },
+  overview: { topic: 'efficiency', source: 'green-ai-entry', mode: 'guided', scenario: 'eff-quality', focus: '' },
+  production: { topic: 'efficiency', source: 'production-performance', mode: 'explore', scenario: 'eff-quality', focus: 'qc21' },
+  defects: { topic: 'quality', source: 'defect-top5', mode: 'explore', scenario: 'eff-quality', focus: 'sewing' },
+  progress: { topic: 'efficiency', source: 'process-progress', mode: 'explore', scenario: 'eff-quality', focus: 'cutting' },
 })
 
 const sharedKnowledge = [

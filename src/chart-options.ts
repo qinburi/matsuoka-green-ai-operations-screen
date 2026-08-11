@@ -1,5 +1,5 @@
 import type { EChartsOption } from 'echarts'
-import type { Issue, TopicDataset, TopicId } from './types'
+import type { FactoryZone, Issue, TopicDataset, TopicId } from './types'
 
 const colors = {
   ai: '#39d98a',
@@ -255,6 +255,75 @@ export function buildTrendOption(dataset: TopicDataset): EChartsOption {
       lineStyle: { width: 2, color: colors.ai },
       itemStyle: { color: colors.ai, borderColor: '#0c1216', borderWidth: 2 },
       areaStyle: { color: 'rgba(57, 217, 138, 0.08)' },
+    }],
+  }
+}
+
+export function buildFactoryFallbackOption(
+  zones: FactoryZone[],
+  selectedId: string | null,
+): EChartsOption {
+  const healthColor = {
+    normal: colors.ai,
+    attention: colors.cyan,
+    warning: colors.amber,
+    critical: colors.danger,
+  }
+  const nodes = zones.map((zone) => ({
+    id: zone.id,
+    name: zone.shortLabel,
+    zoneId: zone.id,
+    value: zone.metricValue,
+    x: zone.position[0],
+    y: zone.position[2],
+    symbol: 'roundRect',
+    symbolSize: selectedId === zone.id ? [96, 54] : [84, 48],
+    itemStyle: {
+      color: '#11191e',
+      borderColor: healthColor[zone.health],
+      borderWidth: selectedId === zone.id ? 2 : 1,
+      shadowBlur: selectedId === zone.id ? 18 : 7,
+      shadowColor: healthColor[zone.health],
+    },
+    label: {
+      show: true,
+      color: colors.text,
+      fontSize: 11,
+      formatter: `${zone.shortLabel}\n{metric|${zone.metricValue}}`,
+      rich: { metric: { color: healthColor[zone.health], fontSize: 9, lineHeight: 18 } },
+    },
+  }))
+  const links = zones.slice(0, -1).map((zone, index) => ({
+    source: zone.id,
+    target: zones[index + 1].id,
+  }))
+
+  return {
+    animationDuration: 650,
+    tooltip: {
+      trigger: 'item',
+      backgroundColor: '#10171c',
+      borderColor: 'rgba(89, 203, 232, 0.35)',
+      textStyle: { color: colors.text },
+      formatter: (params: any) => {
+        const zone = zones.find((item) => item.id === params.data?.zoneId)
+        return zone ? `<strong>${zone.label}</strong><br/>${zone.metric}：${zone.metricValue}` : ''
+      },
+    },
+    series: [{
+      type: 'graph',
+      layout: 'none',
+      roam: true,
+      left: 48,
+      right: 48,
+      top: 48,
+      bottom: 48,
+      data: nodes,
+      links,
+      edgeSymbol: ['none', 'arrow'],
+      edgeSymbolSize: 7,
+      lineStyle: { color: colors.cyan, width: 1.5, opacity: 0.55, curveness: 0.08 },
+      emphasis: { focus: 'adjacency' },
     }],
   }
 }

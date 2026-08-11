@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { onBeforeUnmount, ref } from 'vue'
-import { versionRelease } from '../version'
+import { versionHistory, versionRelease } from '../version'
 
 const open = ref(false)
 
@@ -89,6 +89,23 @@ onBeforeUnmount(() => document.removeEventListener('keydown', handleKeydown))
             <ul class="version-boundaries">
               <li v-for="item in versionRelease.boundaries" :key="item">{{ item }}</li>
             </ul>
+          </section>
+
+          <section class="version-section version-section--history">
+            <div class="version-section__heading">
+              <span>03</span>
+              <div>
+                <h3>历史版本</h3>
+                <p>保留已发布版本的内容记录</p>
+              </div>
+            </div>
+            <ol class="version-history">
+              <li v-for="release in versionHistory.slice(1)" :key="release.version">
+                <strong>{{ release.version }}</strong>
+                <span>{{ release.title }}</span>
+                <small>{{ release.releasedAt }}</small>
+              </li>
+            </ol>
           </section>
         </section>
       </div>
