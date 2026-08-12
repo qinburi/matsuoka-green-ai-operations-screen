@@ -234,7 +234,11 @@ function storyLoop(now: number) {
 }
 
 function updateRoute() {
-  const routeName = route.meta.uiVersion === 'v2.0.0' ? 'v2-analysis' : 'analysis'
+  const routeName = route.meta.uiVersion === 'v2.1.0'
+    ? 'v21-analysis'
+    : route.meta.uiVersion === 'v2.0.0'
+      ? 'v2-analysis'
+      : 'analysis'
   router.replace({
     name: routeName,
     query: {
@@ -253,7 +257,12 @@ function pauseForInteraction() {
 }
 
 function backToOverview() {
-  router.push({ name: route.meta.uiVersion === 'v2.0.0' ? 'v2-overview' : 'overview' })
+  const routeName = route.meta.uiVersion === 'v2.1.0'
+    ? 'v21-overview'
+    : route.meta.uiVersion === 'v2.0.0'
+      ? 'v2-overview'
+      : 'overview'
+  router.push({ name: routeName })
 }
 
 function selectZone(zoneId: string) {

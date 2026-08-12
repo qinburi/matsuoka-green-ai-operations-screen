@@ -19,16 +19,101 @@ export interface VersionRelease {
   changes: readonly VersionChange[]
 }
 
-export const CURRENT_PRODUCT_VERSION = 'v2.1.0'
+export const CURRENT_PRODUCT_VERSION = 'v4.0.0'
 
 // Future versions are added here manually together with their routes and append-only changes.
 export const versionHistory: readonly VersionRelease[] = [
   {
+    version: 'v4.0.0',
+    releasedAt: '2026-08-12',
+    title: '绿色AI工厂健康体检与干预中心',
+    status: 'current',
+    prototypeRoutes: { overview: 'overview', analysis: 'analysis' },
+    highlights: [
+      '将产品主线重构为发现问题、预警分级、推荐检查、建议责任、记录干预和验证复发的管理闭环。',
+      '覆盖订单计划至成品仓出货的十个可管理生命周期节点，并排除无法取得数据的海运、码头与清关环节。',
+      '新增健康风向玫瑰、生命周期状态带、今日管理动作、问题身份证和五类标准检查清单。',
+      '新增干预复发时间轴、措施有效性库、履职事实视图与包装/品质异常反向追溯。',
+    ],
+    boundaries: [
+      '第一阶段仅基于现有MES、计划、仓库和质量数据制作前端演示，不连接真实绿色AI模型。',
+      '采购备料指标必须具备采购订单、预计到料和实收入库数据后才能在生产环境形成。',
+      '检查顺序、方案预案和责任岗位均为建议，未实现正式任务分派、消息推送或关闭流程。',
+      '没有真实干预与复发数据时不计算措施有效率，口径冲突时暂停原因、责任和改善结论。',
+      'V4仅提供桌面端与大屏布局，不制作手机端。',
+    ],
+    changes: [
+      {
+        id: 'v4-health-loop',
+        changedAt: '2026-08-12',
+        category: '产品主线',
+        title: '升级为工厂健康体检与干预闭环',
+        description: '从图表讲解转向问题预警、检查推荐、干预记录和复发验证的管理工作台。',
+      },
+      {
+        id: 'v4-lifecycle',
+        changedAt: '2026-08-12',
+        category: '生命周期',
+        title: '建立十节点工厂健康视图',
+        description: '覆盖订单计划、采购备料、原料仓、生产、品质、包装和成品仓出货，不包含不可取得数据的海运、码头与清关。',
+      },
+      {
+        id: 'v4-intervention',
+        changedAt: '2026-08-12',
+        category: '干预与验证',
+        title: '新增问题身份证、检查清单与复发验证',
+        description: '区分持续、复发和相似问题，并以事实记录管理响应、干预过程和验证结果。',
+      },
+    ],
+  },
+  {
+    version: 'v3.0.0',
+    releasedAt: '2026-08-12',
+    title: '图表化AI动态问题驾驶舱',
+    status: 'archived',
+    prototypeRoutes: { overview: 'v3-overview', analysis: 'v3-analysis' },
+    highlights: [
+      '以老板现场客户讲解为主线，首屏直接呈现问题、影响、依据、措施和建议责任岗位。',
+      '按六个讲解章节编排十四类ECharts图表，支持问题、工序、证据与措施联动。',
+      '增加78秒自动演示、手动章节控制、预设措施组合和改善前后演示模拟。',
+      '采用明亮AI科技风格，使用程序化光球、受控粒子、渐变、霓虹关系线和玻璃图表层。',
+    ],
+    boundaries: [
+      '全部图表、分析结论和改善结果均为演示数据，不代表松冈真实生产结论或预测结果。',
+      '相关性与AI假设必须由客户现场数据和责任岗位复核，不作为已确认因果。',
+      'V3仅提供桌面端与大屏布局，不制作手机端。',
+      '未连接真实生产接口、模型服务、任务分派或消息闭环。',
+    ],
+    changes: [
+      {
+        id: 'v3-chart-cockpit',
+        changedAt: '2026-08-12',
+        category: '问题驾驶舱',
+        title: '升级为图表化AI问题驾驶舱',
+        description: '围绕管理态势、问题定位、数据证据、原因分析、方案模拟和责任验证重构分析页。',
+      },
+      {
+        id: 'v3-chart-story',
+        changedAt: '2026-08-12',
+        category: '图表与动效',
+        title: '新增十四类图表与78秒讲解故事线',
+        description: '按章节延迟加载图表，并实现问题、时间窗口和改善状态的平滑联动。',
+      },
+      {
+        id: 'v3-ai-visual',
+        changedAt: '2026-08-12',
+        category: 'AI视觉',
+        title: '采用明亮AI科技视觉',
+        description: '增加程序化光球、受控粒子、渐变背景、局部霓虹和半透明玻璃图表层。',
+      },
+    ],
+  },
+  {
     version: 'v2.1.0',
     releasedAt: '2026-08-11',
     title: 'AI工业微缩工厂',
-    status: 'current',
-    prototypeRoutes: { overview: 'overview', analysis: 'analysis' },
+    status: 'archived',
+    prototypeRoutes: { overview: 'v21-overview', analysis: 'v21-analysis' },
     highlights: [
       '将九类工序岛升级为具有独立机构、物料接口和物流方向的程序化工业模型。',
       '新增业务状态驱动的语义物流、瓶颈传播、AI诊断链和改善恢复模拟。',

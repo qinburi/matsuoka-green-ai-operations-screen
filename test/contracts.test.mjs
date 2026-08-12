@@ -56,10 +56,14 @@ test('当前产品版本与package版本一致且保留完整版本配置', () =
   const configuredVersion = versionSource.match(/CURRENT_PRODUCT_VERSION = '(v[^']+)'/)?.[1]
 
   assert.equal(configuredVersion, `v${packageJson.version}`)
+  assert.match(versionSource, /version: 'v4\.0\.0'/)
+  assert.match(versionSource, /version: 'v3\.0\.0'/)
   assert.match(versionSource, /version: 'v2\.1\.0'/)
   assert.match(versionSource, /version: 'v2\.0\.0'/)
   assert.match(versionSource, /version: 'v1\.0\.0'/)
   assert.match(versionSource, /prototypeRoutes: \{ overview: 'overview', analysis: 'analysis' \}/)
+  assert.match(versionSource, /prototypeRoutes: \{ overview: 'v3-overview', analysis: 'v3-analysis' \}/)
+  assert.match(versionSource, /prototypeRoutes: \{ overview: 'v21-overview', analysis: 'v21-analysis' \}/)
   assert.match(versionSource, /prototypeRoutes: \{ overview: 'v2-overview', analysis: 'v2-analysis' \}/)
   assert.match(versionSource, /prototypeRoutes: \{ overview: 'v1-overview', analysis: 'v1-analysis' \}/)
   assert.match(versionSource, /id: 'v1-launch'/)
@@ -67,11 +71,15 @@ test('当前产品版本与package版本一致且保留完整版本配置', () =
   assert.match(versionSource, /id: 'v21-semantic-motion'/)
 })
 
-test('六条版本路由具有明确页面类型和版本元数据', () => {
+test('十条版本路由具有明确页面类型和版本元数据', () => {
   const routerSource = readProjectFile('src/router.ts')
 
   assert.match(routerSource, /path: '\/', name: 'overview'.*uiVersion: CURRENT_PRODUCT_VERSION, viewKind: 'overview'/)
   assert.match(routerSource, /path: '\/analysis', name: 'analysis'.*uiVersion: CURRENT_PRODUCT_VERSION, viewKind: 'analysis'/)
+  assert.match(routerSource, /path: '\/v3\/', alias: '\/v3', name: 'v3-overview'.*uiVersion: 'v3\.0\.0', viewKind: 'overview'/)
+  assert.match(routerSource, /path: '\/v3\/analysis', name: 'v3-analysis'.*uiVersion: 'v3\.0\.0', viewKind: 'analysis'/)
+  assert.match(routerSource, /path: '\/v21\/', alias: '\/v21', name: 'v21-overview'.*uiVersion: 'v2\.1\.0', viewKind: 'overview'/)
+  assert.match(routerSource, /path: '\/v21\/analysis', name: 'v21-analysis'.*uiVersion: 'v2\.1\.0', viewKind: 'analysis'/)
   assert.match(routerSource, /path: '\/v2\/', alias: '\/v2', name: 'v2-overview'.*uiVersion: 'v2\.0\.0', viewKind: 'overview'/)
   assert.match(routerSource, /path: '\/v2\/analysis', name: 'v2-analysis'.*uiVersion: 'v2\.0\.0', viewKind: 'analysis'/)
   assert.match(routerSource, /path: '\/v1\/', alias: '\/v1', name: 'v1-overview'.*uiVersion: 'v1\.0\.0', viewKind: 'overview'/)
@@ -126,15 +134,22 @@ test('抽象数字孪生覆盖九个工序并可追溯到问题', () => {
   assert.equal(visualKinds.size, 9)
 })
 
-test('V2.1使用独立语义三维场景且V2.0继续加载原场景', () => {
+test('V3使用独立图表驾驶舱且V2.1与V2.0继续加载历史场景', () => {
   const analysisSource = readProjectFile('src/views/AnalysisView.vue')
+  const v3AnalysisSource = readProjectFile('src/views/V3AnalysisView.vue')
+  const routerSource = readProjectFile('src/router.ts')
   const v21SceneSource = readProjectFile('src/components/FactoryTwinSceneV21.vue')
 
   assert.match(analysisSource, /v-if="isV21"/)
   assert.match(analysisSource, /<FactoryTwinSceneV21/)
   assert.match(analysisSource, /<FactoryTwinScene\s+v-else/)
-  assert.match(analysisSource, /route\.meta\.uiVersion === 'v2\.0\.0' \? 'v2-analysis' : 'analysis'/)
-  assert.match(analysisSource, /route\.meta\.uiVersion === 'v2\.0\.0' \? 'v2-overview' : 'overview'/)
+  assert.match(analysisSource, /'v21-analysis'/)
+  assert.match(analysisSource, /'v2-analysis'/)
+  assert.match(analysisSource, /'v21-overview'/)
+  assert.match(analysisSource, /'v2-overview'/)
+  assert.match(routerSource, /name: 'v3-analysis', component: V3AnalysisView/)
+  assert.match(v3AnalysisSource, /图表化AI问题驾驶舱/)
+  assert.doesNotMatch(v3AnalysisSource, /数据接入|质量校验|知识召回|CPU小模型分析|结论生成/)
   assert.match(analysisSource, /currentChapterIndex\.value = 1/)
   assert.match(v21SceneSource, /UnrealBloomPass/)
   assert.match(v21SceneSource, /CatmullRomCurve3/)
@@ -143,6 +158,106 @@ test('V2.1使用独立语义三维场景且V2.0继续加载原场景', () => {
   assert.match(v21SceneSource, /window\.addEventListener\('resize', handleViewportChange\)/)
   assert.match(v21SceneSource, /bloomPass\?\.dispose\(\)/)
   assert.doesNotMatch(v21SceneSource, /TextureLoader|CanvasTexture|\.webp|\.png|\.jpe?g/)
+})
+
+test('V4生命周期固定为十节点且不包含不可取得的数据环节', () => {
+  const dataSource = readProjectFile('src/data/v4-health-center.ts')
+  const typeSource = readProjectFile('src/types.ts')
+  const expectedNodes = ['order-plan', 'procurement', 'material-warehouse', 'cutting', 'sewing', 'special-process', 'finishing', 'quality', 'packing', 'finished-warehouse']
+  const nodeBlock = dataSource.match(/lifecycleNodes:[\s\S]*?\n\]/)?.[0] ?? ''
+
+  for (const node of expectedNodes) assert.match(nodeBlock, new RegExp(`id: '${node}'`))
+  assert.equal((nodeBlock.match(/ id: '/g) ?? []).length, 10)
+  assert.doesNotMatch(nodeBlock, /海运|码头|清关/)
+  for (const typeName of ['LifecycleNode', 'ProblemIdentity', 'AlertEvent', 'InterventionRecord', 'SolutionEffectiveness', 'ManagementAction']) {
+    assert.match(typeSource, new RegExp(`interface ${typeName}`))
+  }
+})
+
+test('V4问题具备身份证、预警、五类检查、责任与验证要求', () => {
+  const dataSource = readProjectFile('src/data/v4-health-center.ts')
+  const viewSource = readProjectFile('src/views/V4HealthInterventionView.vue')
+
+  for (const category of ['设备', '物料', '工艺', '人员', '管理']) assert.match(dataSource, new RegExp(`'${category}'`))
+  for (const alert of ['首次提示', '二次加强', '三次警报', '待干预', '验证中', '再次复发']) assert.match(dataSource, new RegExp(alert))
+  assert.match(viewSource, /问题身份证/)
+  assert.match(viewSource, /标准检查清单/)
+  assert.match(viewSource, /建议责任/)
+  assert.match(viewSource, /验证要求/)
+  assert.match(viewSource, /反向追溯/)
+  assert.match(viewSource, /AI仅推荐顺序/)
+})
+
+test('V4核心图表与生命周期状态带支持联动下钻', () => {
+  const viewSource = readProjectFile('src/views/V4HealthInterventionView.vue')
+  const chartSource = readProjectFile('src/v4-chart-options.ts')
+  const echartSource = readProjectFile('src/components/EChart.vue')
+
+  for (const builder of ['buildHealthRoseOption', 'buildPeriodCompareOption', 'buildProblemParetoOption', 'buildInterventionTrendOption', 'buildClosureFunnelOption']) assert.match(chartSource, new RegExp(`function ${builder}`))
+  assert.match(viewSource, /v4-lifecycle-strip/)
+  assert.match(viewSource, /@select="handleRoseSelect"/)
+  assert.match(viewSource, /@select="handleSecondarySelect"/)
+  assert.match(viewSource, /qc21: 'quality'/)
+  assert.match(viewSource, /sewing: 'sewing'/)
+  assert.match(viewSource, /cutting: 'cutting'/)
+  assert.match(echartSource, /FunnelChart/)
+})
+
+test('V4异常数据状态暂停原因、岗位和改善结论', () => {
+  const viewSource = readProjectFile('src/views/V4HealthInterventionView.vue')
+  const typeSource = readProjectFile('src/types.ts')
+  const chartSource = readProjectFile('src/components/EChart.vue')
+
+  assert.match(typeSource, /'metric-conflict'/)
+  assert.match(viewSource, /conclusionsAllowed/)
+  assert.match(viewSource, /不展示原因、方案或责任关联/)
+  assert.match(chartSource, /指标口径存在冲突/)
+})
+
+test('V4提供干预记录、复发、措施库与履职事实但不表现为正式任务', () => {
+  const viewSource = readProjectFile('src/views/V4HealthInterventionView.vue')
+  const dataSource = readProjectFile('src/data/v4-health-center.ts')
+  const versionSource = readProjectFile('src/version.ts')
+
+  assert.match(viewSource, /保存演示干预记录/)
+  assert.match(viewSource, /未下发正式任务/)
+  assert.match(viewSource, /预警与复发时间轴/)
+  assert.match(viewSource, /措施有效性库/)
+  assert.match(viewSource, /不评价能力或态度/)
+  assert.match(dataSource, /baselineStatus: 'pending'/)
+  assert.match(versionSource, /V4仅提供桌面端与大屏布局，不制作手机端/)
+})
+
+test('V3包含六章节78秒故事线和十四类图表', () => {
+  const dataSource = readProjectFile('src/data/v3-dashboard.ts')
+  const typeSource = readProjectFile('src/types.ts')
+  const chapterBlock = dataSource.match(/v3StoryChapters[\s\S]*?] as const/)?.[0] ?? ''
+  const durations = [...chapterBlock.matchAll(/duration: (\d+)/g)].map((match) => Number(match[1]))
+  const chartIds = [
+    'health-radar', 'issue-scatter', 'process-heatmap', 'completion-trend', 'defect-trend',
+    'defect-pareto', 'queue-area', 'evidence-timeline', 'causal-graph', 'reason-waterfall',
+    'action-matrix', 'improvement-compare', 'responsibility-sankey', 'validation-progress',
+  ]
+
+  assert.equal(durations.length, 6)
+  assert.equal(durations.reduce((sum, duration) => sum + duration, 0), 78)
+  for (const id of chartIds) {
+    assert.match(typeSource, new RegExp(`'${id}'`))
+    assert.match(dataSource, new RegExp(`'${id}'`))
+  }
+  assert.equal(new Set(chartIds).size, 14)
+  assert.equal((chapterBlock.match(/conclusion:/g) ?? []).length, 6)
+})
+
+test('V3仅提供桌面大屏布局并保持演示边界', () => {
+  const viewSource = readProjectFile('src/views/V3AnalysisView.vue')
+  const styleSource = readProjectFile('src/styles.css')
+  const versionSource = readProjectFile('src/version.ts')
+
+  assert.match(viewSource, /请使用桌面大屏查看/)
+  assert.match(styleSource, /@media \(max-width: 1180px\)/)
+  assert.match(versionSource, /V3仅提供桌面端与大屏布局，不制作手机端/)
+  assert.match(viewSource, /不代表实际预测结果/)
 })
 
 test('V2.1工序动画由六态状态机和AI阶段驱动', () => {

@@ -1,6 +1,6 @@
 export type TopicId = 'efficiency' | 'quality' | 'improvement'
 export type Severity = 'critical' | 'warning' | 'attention'
-export type DataState = 'normal' | 'empty' | 'error' | 'forbidden' | 'stale'
+export type DataState = 'normal' | 'loading' | 'empty' | 'error' | 'forbidden' | 'stale' | 'metric-conflict'
 export type ExperienceMode = 'guided' | 'explore'
 export type ZoneHealth = 'normal' | 'attention' | 'warning' | 'critical'
 export type RelationType = 'fact' | 'correlation' | 'ai-hypothesis' | 'confirmed-cause'
@@ -17,6 +17,22 @@ export type ProcessVisualKind =
   | 'inspection-final'
   | 'folding'
   | 'warehouse'
+
+export type V3ChartId =
+  | 'health-radar'
+  | 'issue-scatter'
+  | 'process-heatmap'
+  | 'completion-trend'
+  | 'defect-trend'
+  | 'defect-pareto'
+  | 'queue-area'
+  | 'evidence-timeline'
+  | 'causal-graph'
+  | 'reason-waterfall'
+  | 'action-matrix'
+  | 'improvement-compare'
+  | 'responsibility-sankey'
+  | 'validation-progress'
 
 export interface MetricDefinition {
   id: string
@@ -217,4 +233,196 @@ export interface DemoScenario {
   title: string
   totalDuration: number
   chapters: DemoChapter[]
+}
+
+export interface ChartStoryChapter {
+  id: string
+  order: number
+  title: string
+  kicker: string
+  duration: number
+  narrative: string
+  conclusion: string
+  chartIds: V3ChartId[]
+  focusIssueId: string
+}
+
+export interface ChartInteractionContext {
+  topic: TopicId
+  issueId: string
+  zoneId: string | null
+  timeWindow: string | null
+  batch: string | null
+  actionPackageId: string | null
+}
+
+export interface CausalNode {
+  id: string
+  type: 'issue' | 'evidence' | 'reason' | 'hypothesis' | 'solution' | 'responsibility'
+  label: string
+  detail: string
+  issueId: string
+}
+
+export interface CausalEdge {
+  source: string
+  target: string
+  relationType: RelationType
+  confidence: number
+  evidenceRef: string
+  confirmation: ConfirmationState
+}
+
+export interface ActionPackage {
+  id: string
+  issueId: string
+  title: string
+  actions: string[]
+  prerequisites: string[]
+  validationMetrics: string[]
+  responsibility: Responsibility
+  improvement: ImprovementSnapshot | null
+  disclaimer: string
+}
+
+export type LifecycleNodeId =
+  | 'order-plan'
+  | 'procurement'
+  | 'material-warehouse'
+  | 'cutting'
+  | 'sewing'
+  | 'special-process'
+  | 'finishing'
+  | 'quality'
+  | 'packing'
+  | 'finished-warehouse'
+
+export type LifecycleHealth = 'normal' | 'notice' | 'warning' | 'critical'
+export type AlertLevel = 'normal' | 'first' | 'second' | 'third' | 'intervention' | 'verifying' | 'resolved' | 'recurring'
+export type ThresholdType = 'standard' | 'management' | 'trend'
+export type RecurrenceState = 'continuous' | 'recurring' | 'similar' | 'not-recurred' | 'pending'
+export type ChecklistCategory = '设备' | '物料' | '工艺' | '人员' | '管理'
+export type ActionPriority = 'P1' | 'P2' | 'P3'
+export type ActionStatus = '待响应' | '已响应' | '验证中' | '已完成'
+
+export interface LifecycleMetric {
+  label: string
+  value: number
+  unit: string
+  definition: string
+}
+
+export interface LifecycleNode {
+  id: LifecycleNodeId
+  order: number
+  label: string
+  shortLabel: string
+  department: string
+  dataSource: string
+  health: LifecycleHealth
+  impactIndex: number
+  issueCount: number
+  coreMetric: LifecycleMetric
+  updatedAt: string
+  issueIds: string[]
+}
+
+export interface ProblemIdentity {
+  problemType: string
+  factory: string
+  process: string
+  styleNo: string
+  batch: string
+  station: string
+  timeWindow: string
+  continuousCount: number
+  firstOccurredAt: string
+  lastOccurredAt: string
+  recurrenceState: RecurrenceState
+}
+
+export interface AlertEvent {
+  id: string
+  occurredAt: string
+  level: AlertLevel
+  levelLabel: string
+  triggerRule: string
+  period: string
+  thresholdType: ThresholdType
+  threshold: string
+  evidence: string
+}
+
+export interface InspectionItem {
+  id: string
+  category: ChecklistCategory
+  label: string
+  method: string
+  requiredEvidence: string
+  selected: boolean
+}
+
+export interface InterventionRecord {
+  id: string
+  problemId: string
+  handler: string
+  checkedItemIds: string[]
+  actualMeasure: string
+  handledAt: string
+  verifyAt: string
+  recurrenceResult: '待验证' | '未复发' | '再次复发'
+  isDemo: boolean
+}
+
+export interface SolutionEffectiveness {
+  id: string
+  problemType: string
+  measure: string
+  usageCount: number | null
+  nonRecurrenceCount: number | null
+  averageRecurrenceInterval: string | null
+  applicableConditions: string[]
+  baselineStatus: 'available' | 'pending'
+}
+
+export interface ManagementAction {
+  id: string
+  problemId: string
+  priority: ActionPriority
+  action: string
+  triggerBasis: string
+  suggestedRole: string
+  expectedVerificationAt: string
+  status: ActionStatus
+}
+
+export interface DutyFact {
+  label: '应响应' | '已响应' | '超时' | '缺记录' | '待验证' | '重复发生'
+  count: number
+  definition: string
+}
+
+export interface HealthProblem {
+  id: string
+  nodeId: LifecycleNodeId
+  title: string
+  problemType: string
+  alertLevel: AlertLevel
+  severity: LifecycleHealth
+  impactValue: number
+  impactUnit: string
+  changeFromYesterday: number
+  responseStatus: '待响应' | '已响应' | '超时' | '缺记录' | '待验证'
+  summary: string
+  identity: ProblemIdentity
+  facts: Evidence[]
+  alertEvents: AlertEvent[]
+  inspectionItems: InspectionItem[]
+  plan: string[]
+  suggestedDepartment: string
+  suggestedRole: string
+  verificationRequirement: string
+  dataGaps: string[]
+  traceNodeIds: LifecycleNodeId[]
+  traceConfirmation: 'confirmed' | 'pending'
 }

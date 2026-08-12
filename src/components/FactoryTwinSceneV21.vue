@@ -111,6 +111,7 @@ const stateCopy: Record<Exclude<DataState, 'normal'> | 'loading', { title: strin
   error: { title: '分析数据加载失败', detail: '请检查数据源连接或重新分析' },
   forbidden: { title: '当前账号无权查看', detail: '需由管理员授予生产诊断数据权限' },
   stale: { title: '数据已过期', detail: '三维态势可查看，结论需复核' },
+  'metric-conflict': { title: '指标口径存在冲突', detail: '请先确认统计口径再恢复分析' },
 }
 
 const blockingState = computed(() => {

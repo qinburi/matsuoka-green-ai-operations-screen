@@ -34,8 +34,10 @@ export const sourceLabels: Record<string, string> = {
 
 export const stateLabels = {
   normal: '正常演示',
+  loading: '加载中',
   empty: '空数据',
   error: '加载失败',
   forbidden: '无权限',
   stale: '数据过期',
+  'metric-conflict': '口径冲突',
 } as const
