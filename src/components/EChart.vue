@@ -49,20 +49,48 @@ const emit = defineEmits<{
 const chartEl = ref<HTMLDivElement | null>(null)
 let chart: echarts.ECharts | null = null
 let resizeObserver: ResizeObserver | null = null
+let initFrame = 0
+
+function hasRenderableSize(element: HTMLDivElement) {
+  return element.clientWidth > 0 && element.clientHeight > 0
+}
+
+function ensureChart() {
+  const element = chartEl.value
+  if (chart || !element || !hasRenderableSize(element)) return false
+
+  chart = echarts.init(element, undefined, { renderer: 'canvas' })
+  chart.on('click', (params) => emit('select', params.data))
+  return true
+}
+
+function scheduleRender() {
+  window.cancelAnimationFrame(initFrame)
+  initFrame = window.requestAnimationFrame(() => {
+    if (!ensureChart()) return
+    chart?.resize()
+    renderChart()
+  })
+}
 
 function renderChart() {
-  if (!chart || props.state !== 'normal' && props.state !== 'stale') return
+  if (!chart) {
+    scheduleRender()
+    return
+  }
+  if (props.state !== 'normal' && props.state !== 'stale') return
   chart.setOption(props.option, { notMerge: true, lazyUpdate: false })
 }
 
 onMounted(async () => {
   await nextTick()
   if (!chartEl.value) return
-  chart = echarts.init(chartEl.value, undefined, { renderer: 'canvas' })
-  chart.on('click', (params) => emit('select', params.data))
-  resizeObserver = new ResizeObserver(() => window.requestAnimationFrame(() => chart?.resize()))
+  resizeObserver = new ResizeObserver(() => {
+    if (!chart) scheduleRender()
+    else window.requestAnimationFrame(() => chart?.resize())
+  })
   resizeObserver.observe(chartEl.value)
-  renderChart()
+  scheduleRender()
 })
 
 watch(() => props.option, renderChart, { deep: true })
@@ -73,6 +101,7 @@ watch(() => props.state, async () => {
 })
 
 onBeforeUnmount(() => {
+  window.cancelAnimationFrame(initFrame)
   resizeObserver?.disconnect()
   chart?.dispose()
 })

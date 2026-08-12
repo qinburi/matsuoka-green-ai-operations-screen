@@ -3,6 +3,7 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { hotspotContexts, rawTopics } from '../src/data/demo-raw.mjs'
 import { demoScenarioRaw, factoryZonesRaw, issueRelationsRaw } from '../src/data/factory-scene-raw.mjs'
+import { alertRuleConfigRaw, calculateStabilityAssessmentRaw, evaluateAlertSequenceRaw } from '../src/data/v4-rules-raw.mjs'
 
 const readProjectFile = (path) => readFileSync(new URL(`../${path}`, import.meta.url), 'utf-8')
 
@@ -174,58 +175,141 @@ test('V4生命周期固定为十节点且不包含不可取得的数据环节', 
   }
 })
 
-test('V4问题具备身份证、预警、五类检查、责任与验证要求', () => {
+test('V4保留问题身份证、预警与后续分析所需数据模型', () => {
   const dataSource = readProjectFile('src/data/v4-health-center.ts')
   const viewSource = readProjectFile('src/views/V4HealthInterventionView.vue')
 
   for (const category of ['设备', '物料', '工艺', '人员', '管理']) assert.match(dataSource, new RegExp(`'${category}'`))
   for (const alert of ['首次提示', '二次加强', '三次警报', '待干预', '验证中', '再次复发']) assert.match(dataSource, new RegExp(alert))
   assert.match(viewSource, /问题身份证/)
-  assert.match(viewSource, /标准检查清单/)
-  assert.match(viewSource, /建议责任/)
-  assert.match(viewSource, /验证要求/)
-  assert.match(viewSource, /反向追溯/)
-  assert.match(viewSource, /AI仅推荐顺序/)
+  assert.match(viewSource, /RECORDED FACTS/)
+  assert.match(viewSource, /建议岗位/)
 })
 
-test('V4核心图表与生命周期状态带支持联动下钻', () => {
+test('V4使用十节点自由画布、四周期轨道与三步手动分析链', () => {
   const viewSource = readProjectFile('src/views/V4HealthInterventionView.vue')
   const chartSource = readProjectFile('src/v4-chart-options.ts')
-  const echartSource = readProjectFile('src/components/EChart.vue')
 
-  for (const builder of ['buildHealthRoseOption', 'buildPeriodCompareOption', 'buildProblemParetoOption', 'buildInterventionTrendOption', 'buildClosureFunnelOption']) assert.match(chartSource, new RegExp(`function ${builder}`))
-  assert.match(viewSource, /v4-lifecycle-strip/)
-  assert.match(viewSource, /@select="handleRoseSelect"/)
-  assert.match(viewSource, /@select="handleSecondarySelect"/)
+  for (const builder of ['buildLifecycleCanvasOption', 'buildProblemFocusOption', 'buildPeriodComparisonOption', 'buildEvidenceTrendOption', 'buildCandidateEvidenceOption', 'buildActionPriorityOption', 'buildManagementEffectivenessOption', 'buildValidationTimelineOption']) assert.match(chartSource, new RegExp(`function ${builder}`))
+  assert.match(chartSource, /type: 'graph'/)
+  assert.match(chartSource, /type: 'custom'/)
+  assert.match(viewSource, /v4-canvas-stage/)
+  assert.match(viewSource, /v4-issue-beacon/)
+  assert.match(viewSource, /v4-period-rail/)
+  assert.match(viewSource, /问题与证据/)
+  assert.match(viewSource, /原因与方案/)
+  assert.match(viewSource, /责任与验证/)
+  assert.match(viewSource, /@select="handleLifecycleSelect"/)
+  assert.match(viewSource, /@select="handlePeriodSelect"/)
+  assert.match(viewSource, /返回全厂/)
+  assert.match(viewSource, /viewMode === 'problem'/)
+  assert.match(viewSource, /上一步/)
+  assert.match(viewSource, /下一步/)
+  assert.doesNotMatch(viewSource, /自动播放|重新开始|下一章节|setInterval/)
   assert.match(viewSource, /qc21: 'quality'/)
   assert.match(viewSource, /sewing: 'sewing'/)
   assert.match(viewSource, /cutting: 'cutting'/)
-  assert.match(echartSource, /FunnelChart/)
 })
 
-test('V4异常数据状态暂停原因、岗位和改善结论', () => {
+test('V4缝皱警报先进入事实关联总览再手动进入三步分析', () => {
+  const viewSource = readProjectFile('src/views/V4HealthInterventionView.vue')
+  const chartSource = readProjectFile('src/v4-chart-options.ts')
+  const typeSource = readProjectFile('src/types.ts')
+  const versionSource = readProjectFile('src/version.ts')
+
+  assert.match(typeSource, /type ProblemDisplayPhase = 'relation' \| 'analysis'/)
+  assert.match(viewSource, /problemPhase = ref<ProblemDisplayPhase>/)
+  assert.match(viewSource, /problemPhase === 'relation'/)
+  assert.match(viewSource, /进入三步分析/)
+  assert.match(viewSource, /pushRoute\(problem\.id\)/)
+  assert.match(viewSource, /pushRoute\(activeProblem\.value\.id, 1\)/)
+  assert.match(viewSource, /replaceRoute\(viewMode\.value === 'problem'/)
+  assert.match(viewSource, /Number\.isInteger\(step\) && step >= 1 && step <= 3/)
+  assert.match(viewSource, /@select="handleProblemFocusSelect"/)
+  assert.match(chartSource, /relationType: 'fact'/)
+  assert.match(chartSource, /relationType: 'trace-pending'/)
+  assert.match(chartSource, /relationType: 'alert-fact'/)
+  assert.match(chartSource, /problem\.traceNodeIds/)
+  assert.match(chartSource, /琥珀虚线 · 追溯范围待现场确认/)
+  assert.match(versionSource, /恢复缝皱问题事实关联总览/)
+})
+
+test('V4异常数据状态暂停问题结论且保留生命周期状态', () => {
   const viewSource = readProjectFile('src/views/V4HealthInterventionView.vue')
   const typeSource = readProjectFile('src/types.ts')
   const chartSource = readProjectFile('src/components/EChart.vue')
 
   assert.match(typeSource, /'metric-conflict'/)
-  assert.match(viewSource, /conclusionsAllowed/)
-  assert.match(viewSource, /不展示原因、方案或责任关联/)
+  assert.match(viewSource, /canShowConclusion/)
+  assert.match(viewSource, /指标口径存在冲突/)
+  assert.match(viewSource, /确认口径前暂停结论/)
+  assert.match(viewSource, /不生成候选原因、方案、岗位或员工素质建议/)
   assert.match(chartSource, /指标口径存在冲突/)
 })
 
-test('V4提供干预记录、复发、措施库与履职事实但不表现为正式任务', () => {
+test('V4移除干预记录、复发分析、措施库与履职评价界面', () => {
   const viewSource = readProjectFile('src/views/V4HealthInterventionView.vue')
-  const dataSource = readProjectFile('src/data/v4-health-center.ts')
   const versionSource = readProjectFile('src/version.ts')
 
-  assert.match(viewSource, /保存演示干预记录/)
-  assert.match(viewSource, /未下发正式任务/)
-  assert.match(viewSource, /预警与复发时间轴/)
-  assert.match(viewSource, /措施有效性库/)
-  assert.match(viewSource, /不评价能力或态度/)
-  assert.match(dataSource, /baselineStatus: 'pending'/)
+  assert.doesNotMatch(viewSource, /保存演示干预记录|新增干预记录|措施有效性库|履职事实|个人总分|排名按钮|正式派单按钮|发送消息按钮/)
+  assert.doesNotMatch(viewSource, /InterventionRecord|interventionRecords|solutionEffectiveness|dutyFacts/)
+  assert.match(versionSource, /未实现正式任务分派、消息推送、干预录入或关闭流程/)
   assert.match(versionSource, /V4仅提供桌面端与大屏布局，不制作手机端/)
+})
+
+test('V4四周期使用稳定路由键和截至当前可比口径', () => {
+  const dataSource = readProjectFile('src/data/v4-analysis.ts')
+  const viewSource = readProjectFile('src/views/V4HealthInterventionView.vue')
+  const typeSource = readProjectFile('src/types.ts')
+
+  assert.match(typeSource, /type PeriodKey = 'yesterday' \| 'today' \| 'week' \| 'month'/)
+  for (const key of ['yesterday', 'today', 'week', 'month']) assert.match(dataSource, new RegExp(`'${key}'`))
+  assert.match(dataSource, /今日截至当前，对比昨日相同生产时间窗/)
+  assert.match(dataSource, /周初至当前，对比上周相同星期与时间范围/)
+  assert.match(dataSource, /月初至当前，对比上月相同日期与时间范围/)
+  assert.match(viewSource, /period: selectedPeriod\.value/)
+  assert.match(viewSource, /periodMetricLabels/)
+})
+
+test('V4三级预警按48小时问题身份证窗口累计并去重连续采样', () => {
+  assert.equal(alertRuleConfigRaw.windowHours, 48)
+  assert.deepEqual(alertRuleConfigRaw.levels.map((item) => item.occurrence), [1, 2, 3])
+  const asOf = '2026-08-12T14:22:00+08:00'
+  const samples = [
+    { episodeId: 'E1', occurredAt: '2026-08-11T09:18:00+08:00', exceeded: true },
+    { episodeId: 'E1', occurredAt: '2026-08-11T09:22:00+08:00', exceeded: true },
+    { episodeId: 'E2', occurredAt: '2026-08-12T11:06:00+08:00', exceeded: true },
+    { episodeId: 'E3', occurredAt: '2026-08-12T13:52:00+08:00', exceeded: true },
+  ]
+  const result = evaluateAlertSequenceRaw(samples, asOf)
+  assert.equal(result.count, 3)
+  assert.equal(result.level, 'third')
+  assert.equal(result.startsIntervention, true)
+})
+
+test('V4稳定度按7、30、90天边界评价并正确处理中断和缺证据', () => {
+  const base = { verifiedAt: '2026-01-01T00:00:00Z', actualMeasureRecorded: true, requiredEvidenceComplete: true, metricConflict: false, recurredAt: null }
+  assert.equal(calculateStabilityAssessmentRaw({ ...base, asOf: '2026-01-07T23:59:59Z' }).level, 'observing')
+  assert.equal(calculateStabilityAssessmentRaw({ ...base, asOf: '2026-01-08T00:00:00Z' }).level, 'pass')
+  assert.equal(calculateStabilityAssessmentRaw({ ...base, asOf: '2026-01-31T00:00:00Z' }).level, 'good')
+  assert.equal(calculateStabilityAssessmentRaw({ ...base, asOf: '2026-04-01T00:00:00Z' }).level, 'excellent')
+  assert.equal(calculateStabilityAssessmentRaw({ ...base, asOf: '2026-02-01T00:00:00Z', recurredAt: '2026-01-20T00:00:00Z' }).level, 'recurred')
+  assert.equal(calculateStabilityAssessmentRaw({ ...base, asOf: '2026-04-01T00:00:00Z', requiredEvidenceComplete: false }).level, 'unavailable')
+  assert.equal(calculateStabilityAssessmentRaw({ ...base, asOf: '2026-04-01T00:00:00Z', metricConflict: true }).level, 'unavailable')
+})
+
+test('V4厂长效能按闭环案例展示且当前缝皱案例不生成员工素质建议', () => {
+  const dataSource = readProjectFile('src/data/v4-analysis.ts')
+  const viewSource = readProjectFile('src/views/V4HealthInterventionView.vue')
+
+  assert.match(dataSource, /status: 'pending-intervention'/)
+  assert.match(dataSource, /verifiedAt: null/)
+  assert.match(dataSource, /label: '未生成员工素质等级建议'/)
+  assert.match(dataSource, /status: 'not-generated'/)
+  assert.match(viewSource, /同期关系，不代表已验证因果关系/)
+  assert.match(viewSource, /按问题闭环案例，不评价个人排名/)
+  assert.match(viewSource, /厂长复核状态：尚不适用 · 只读展示/)
+  assert.doesNotMatch(viewSource, /厂长个人总分|厂长排名|确认素质等级|写入人事档案/)
 })
 
 test('V3包含六章节78秒故事线和十四类图表', () => {

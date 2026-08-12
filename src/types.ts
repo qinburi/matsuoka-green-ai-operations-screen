@@ -304,6 +304,11 @@ export type RecurrenceState = 'continuous' | 'recurring' | 'similar' | 'not-recu
 export type ChecklistCategory = '设备' | '物料' | '工艺' | '人员' | '管理'
 export type ActionPriority = 'P1' | 'P2' | 'P3'
 export type ActionStatus = '待响应' | '已响应' | '验证中' | '已完成'
+export type PeriodKey = 'yesterday' | 'today' | 'week' | 'month'
+export type PeriodMetric = 'count' | 'impact' | 'duration'
+export type ProblemDisplayPhase = 'relation' | 'analysis'
+export type AnalysisStep = 'evidence' | 'cause-solution' | 'responsibility-validation'
+export type StabilityLevel = 'unavailable' | 'observing' | 'pass' | 'good' | 'excellent' | 'recurred'
 
 export interface LifecycleMetric {
   label: string
@@ -400,6 +405,85 @@ export interface DutyFact {
   label: '应响应' | '已响应' | '超时' | '缺记录' | '待验证' | '重复发生'
   count: number
   definition: string
+}
+
+export interface PeriodComparison {
+  period: PeriodKey
+  label: string
+  currentValue: number
+  comparisonValue: number
+  changeRate: number
+  cutoffAt: string
+  definition: string
+  unit: string
+  nodeId: LifecycleNodeId
+}
+
+export interface AlertRuleConfig {
+  windowHours: number
+  identityFields: readonly string[]
+  dedupeRule: string
+  resetRule: string
+  levels: readonly {
+    occurrence: 1 | 2 | 3
+    level: 'first' | 'second' | 'third'
+    label: string
+    action: string
+  }[]
+}
+
+export interface InterventionCase {
+  id: string
+  problemId: string
+  alertEventId: string
+  status: 'pending-intervention' | 'checking' | 'verifying' | 'reopened' | 'stable'
+  generatedAt: string
+  suggestedChecks: string[]
+  suggestedRole: string
+  verificationCondition: string
+  interventionStartedAt: string | null
+  verifiedAt: string | null
+  actualMeasureRecorded: boolean
+  requiredEvidenceComplete: boolean
+  evidenceCompleteness: number
+  coordinationActionsCompleted: number
+  coordinationActionsTotal: number
+}
+
+export interface StabilityAssessment {
+  caseId: string
+  level: StabilityLevel
+  label: string
+  nonRecurrenceDays: number | null
+  verifiedAt: string | null
+  recurredAt: string | null
+  eligible: boolean
+  reason: string
+}
+
+export interface ManagementInterventionEvidence {
+  caseId: string
+  problemLabel: string
+  managerResponseMinutes: number
+  nonRecurrenceDays: number
+  impactValue: number
+  stabilityLevel: Exclude<StabilityLevel, 'unavailable'>
+  coordinationActionsCompleted: number
+  coordinationActionsTotal: number
+  evidenceCompleteness: number
+  plannedVerificationAt: string
+  actualVerificationAt: string | null
+}
+
+export interface EmployeeQualitySuggestion {
+  caseId: string
+  suggestedLevel: 'pass' | 'good' | 'excellent' | null
+  label: string
+  status: 'not-generated' | 'pending-review' | 'confirmed' | 'rejected'
+  applicable: boolean
+  prerequisites: readonly string[]
+  evidenceRefs: readonly string[]
+  reason: string
 }
 
 export interface HealthProblem {

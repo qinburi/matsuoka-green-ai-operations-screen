@@ -4,153 +4,323 @@ import { useRoute, useRouter } from 'vue-router'
 import EChart from '../components/EChart.vue'
 import VersionDialog from '../components/VersionDialog.vue'
 import { contextOptions, defaultContext, sourceLabels } from '../data/demo'
-import { dataStateLabelsV4, dutyFacts, healthProblems, interventionRecords, lifecycleById, lifecycleNodes, managementActions, periodOptions, problemById, solutionEffectiveness } from '../data/v4-health-center'
-import { buildClosureFunnelOption, buildHealthRoseOption, buildInterventionTrendOption, buildPeriodCompareOption, buildProblemParetoOption } from '../v4-chart-options'
-import type { DataState, HealthProblem, InterventionRecord, LifecycleNodeId } from '../types'
+import {
+  actionCandidates,
+  alertRuleConfig,
+  buildPeriodComparisons,
+  candidateEvidence,
+  currentEmployeeQualitySuggestion,
+  currentInterventionCase,
+  currentStabilityAssessment,
+  managementInterventionEvidence,
+  periodKeys,
+  periodLabels,
+  periodMetricLabels,
+} from '../data/v4-analysis'
+import { dataStateLabelsV4, healthProblems, lifecycleById, lifecycleNodes, problemById } from '../data/v4-health-center'
+import {
+  buildActionPriorityOption,
+  buildCandidateEvidenceOption,
+  buildEvidenceTrendOption,
+  buildLifecycleCanvasOption,
+  buildManagementEffectivenessOption,
+  buildPeriodComparisonOption,
+  buildProblemFocusOption,
+  buildValidationTimelineOption,
+} from '../v4-chart-options'
+import type { AnalysisStep, DataState, LifecycleNodeId, PeriodKey, PeriodMetric, ProblemDisplayPhase } from '../types'
 
 const route = useRoute()
 const router = useRouter()
-const context = reactive({ ...defaultContext, source: typeof route.query.source === 'string' ? route.query.source : defaultContext.source })
+const context = reactive({
+  ...defaultContext,
+  source: typeof route.query.source === 'string' ? route.query.source : defaultContext.source,
+})
 const legacyFocusMap: Record<string, LifecycleNodeId> = { qc21: 'quality', sewing: 'sewing', cutting: 'cutting' }
 const requestedFocus = typeof route.query.focus === 'string' ? route.query.focus : ''
-const initialNodeId = lifecycleById.has(requestedFocus as LifecycleNodeId) ? requestedFocus as LifecycleNodeId : legacyFocusMap[requestedFocus] ?? 'quality'
+const initialNodeId = lifecycleById.has(requestedFocus as LifecycleNodeId)
+  ? requestedFocus as LifecycleNodeId
+  : legacyFocusMap[requestedFocus] ?? 'quality'
 const selectedNodeId = ref<LifecycleNodeId>(initialNodeId)
-const requestedProblem = typeof route.query.problem === 'string' ? route.query.problem : ''
-const selectedProblemId = ref<string>(problemById.has(requestedProblem) ? requestedProblem : healthProblems.find((item) => item.nodeId === initialNodeId)?.id ?? 'P-QA-01')
-const period = ref<(typeof periodOptions)[number]>('今日')
-const meetingMode = ref<'daily' | 'shift'>('daily')
-const dataState = ref<DataState>('normal')
+const selectedProblemId = ref('P-QA-01')
+const viewMode = ref<'factory' | 'problem'>(route.query.problem === 'P-QA-01' ? 'problem' : 'factory')
 const filtersOpen = ref(false)
-const metric = ref<'count' | 'impact' | 'duration'>('count')
-const evidenceView = ref<'compare' | 'pareto' | 'trend' | 'funnel'>('compare')
-const interventionTab = ref<'diagnosis' | 'record' | 'recurrence' | 'effectiveness' | 'duty'>('diagnosis')
-const records = ref<InterventionRecord[]>(interventionRecords.map((item) => ({ ...item })))
-const selectedChecks = ref<string[]>([])
-const interventionForm = reactive({ handler: '', measure: '', verifyAt: '2026-08-12 16:00' })
-const recordNotice = ref('')
+const dataState = ref<DataState>('normal')
+const validPeriod = typeof route.query.period === 'string' && periodKeys.includes(route.query.period as PeriodKey)
+const selectedPeriod = ref<PeriodKey>(validPeriod ? route.query.period as PeriodKey : 'today')
+const periodMetric = ref<PeriodMetric>('count')
+const requestedStep = Number(route.query.step)
+const analysisStepIndex = ref(Number.isInteger(requestedStep) && requestedStep >= 1 && requestedStep <= 3 ? requestedStep - 1 : 0)
+const problemPhase = ref<ProblemDisplayPhase>(viewMode.value === 'problem' && Number.isInteger(requestedStep) && requestedStep >= 1 && requestedStep <= 3 ? 'analysis' : 'relation')
+const selectedRelationNodeId = ref<string>('P-QA-01')
 
-const visible = computed(() => dataState.value === 'normal' || dataState.value === 'stale')
-const conclusionsAllowed = computed(() => dataState.value === 'normal')
-const sourceLabel = computed(() => sourceLabels[context.source] ?? '综合入口')
+const analysisSteps: Array<{ id: AnalysisStep; label: string; eyebrow: string }> = [
+  { id: 'evidence', label: '问题与证据', eyebrow: 'STEP 01' },
+  { id: 'cause-solution', label: '原因与方案', eyebrow: 'STEP 02' },
+  { id: 'responsibility-validation', label: '责任与验证', eyebrow: 'STEP 03' },
+]
 const activeNode = computed(() => lifecycleById.get(selectedNodeId.value) ?? lifecycleNodes[7])
-const nodeProblems = computed(() => healthProblems.filter((item) => item.nodeId === selectedNodeId.value))
-const displayedProblems = computed(() => nodeProblems.value.length ? nodeProblems.value : healthProblems)
-const activeProblem = computed<HealthProblem>(() => problemById.get(selectedProblemId.value) ?? displayedProblems.value[0] ?? healthProblems[0])
-const activeActions = computed(() => managementActions.filter((item) => item.problemId === activeProblem.value.id))
-const activeRecords = computed(() => records.value.filter((item) => item.problemId === activeProblem.value.id))
-const activeEffectiveness = computed(() => solutionEffectiveness.filter((item) => item.problemType === activeProblem.value.problemType))
+const activeProblem = computed(() => problemById.get(selectedProblemId.value) ?? healthProblems[0])
+const latestAlert = computed(() => activeProblem.value.alertEvents[activeProblem.value.alertEvents.length - 1])
+const sourceLabel = computed(() => sourceLabels[context.source] ?? '综合入口')
 const chartState = computed(() => dataState.value)
-const roseOption = computed(() => buildHealthRoseOption(lifecycleNodes, selectedNodeId.value))
-const secondaryOption = computed(() => {
-  if (evidenceView.value === 'pareto') return buildProblemParetoOption(healthProblems, activeProblem.value.id)
-  if (evidenceView.value === 'trend') return buildInterventionTrendOption(activeProblem.value, records.value)
-  if (evidenceView.value === 'funnel') return buildClosureFunnelOption(healthProblems)
-  return buildPeriodCompareOption(activeNode.value, metric.value)
+const canShowConclusion = computed(() => dataState.value === 'normal')
+const canOpenRelation = computed(() => dataState.value === 'normal' || dataState.value === 'stale')
+const canShowRecommendations = computed(() => dataState.value === 'normal')
+const activeStep = computed(() => analysisSteps[analysisStepIndex.value])
+const periodData = computed(() => buildPeriodComparisons(activeNode.value, periodMetric.value))
+const lifecycleOption = computed(() => buildLifecycleCanvasOption(lifecycleNodes, selectedNodeId.value, activeProblem.value))
+const problemFocusOption = computed(() => buildProblemFocusOption(lifecycleNodes, activeProblem.value, selectedRelationNodeId.value, dataState.value === 'normal'))
+const periodOption = computed(() => buildPeriodComparisonOption(periodData.value, periodMetric.value, selectedPeriod.value))
+const evidenceTrendOption = computed(() => buildEvidenceTrendOption(activeProblem.value))
+const candidateEvidenceOption = computed(() => buildCandidateEvidenceOption(candidateEvidence))
+const actionPriorityOption = computed(() => buildActionPriorityOption(actionCandidates))
+const managementOption = computed(() => buildManagementEffectivenessOption(managementInterventionEvidence))
+const validationTimelineOption = computed(() => buildValidationTimelineOption())
+const stageSource = computed(() => {
+  if (viewMode.value === 'factory') return activeNode.value.dataSource
+  if (problemPhase.value === 'relation') return '演示：QC2-1检验记录 / 质量预警事件 / 批次追溯关系'
+  if (analysisStepIndex.value === 0) return '演示：QC2-1检验记录 / 质量预警事件 / 批次追溯关系'
+  if (analysisStepIndex.value === 1) return '演示：设备点检 / 工艺标准 / 物料检验 / 巡检记录'
+  return '演示：警报事件 / 管理协调记录 / 验证证据 / 历史闭环案例'
 })
-const secondaryTitle = computed(() => ({ compare: '周期分组对比', pareto: '问题影响 Pareto', trend: '问题与干预趋势', funnel: '问题闭环漏斗' })[evidenceView.value])
+const selectedRelationDetail = computed(() => {
+  if (selectedRelationNodeId.value === activeProblem.value.id) {
+    return { label: activeProblem.value.title, source: '演示：质量预警事件', detail: activeProblem.value.summary, status: '严重异常事实' }
+  }
+  if (selectedRelationNodeId.value.startsWith('fact-')) {
+    const fact = activeProblem.value.facts[Number(selectedRelationNodeId.value.replace('fact-', ''))]
+    if (fact) return { label: fact.label, source: fact.source, detail: `${fact.label}：${fact.value}`, status: '已记录事实' }
+  }
+  if (selectedRelationNodeId.value.startsWith('context-')) {
+    const nodeId = selectedRelationNodeId.value.replace('context-', '') as LifecycleNodeId
+    const node = lifecycleById.get(nodeId)
+    if (node) return { label: node.label, source: node.dataSource, detail: node.coreMetric.definition, status: activeProblem.value.traceNodeIds.includes(nodeId) ? '追溯范围 · 待现场确认' : '生命周期上下文' }
+  }
+  return { label: activeProblem.value.title, source: '演示：质量预警事件', detail: activeProblem.value.summary, status: '严重异常事实' }
+})
 const unavailableCopy = computed(() => {
-  if (dataState.value === 'loading') return ['正在取得健康数据', '原因、岗位和方案暂不形成']
-  if (dataState.value === 'empty') return ['当前筛选范围无问题记录', '可调整时间、工厂或产线范围']
-  if (dataState.value === 'error') return ['数据加载失败', '恢复数据源前不生成管理结论']
-  if (dataState.value === 'forbidden') return ['当前账号无权查看', '需申请生命周期与质量数据权限']
-  if (dataState.value === 'metric-conflict') return ['指标口径存在冲突', '请先确认次数周期、阈值与重置条件']
-  if (dataState.value === 'stale') return ['数据已过期，结论暂停', '可查看历史事实，但检查建议需刷新后恢复']
+  if (dataState.value === 'loading') return ['数据更新中', '暂不形成问题判断']
+  if (dataState.value === 'empty') return ['当前范围无可用数据', '请调整筛选范围']
+  if (dataState.value === 'error') return ['数据加载失败', '恢复数据源后重新分析']
+  if (dataState.value === 'forbidden') return ['当前账号无权查看', '请申请对应数据权限']
+  if (dataState.value === 'metric-conflict') return ['指标口径存在冲突', '确认口径前暂停结论']
+  if (dataState.value === 'stale') return ['数据已过期', '仅展示历史状态，结论待复核']
   return null
 })
-const latestAlert = (problem: HealthProblem) => problem.alertEvents[problem.alertEvents.length - 1]
+
+function routeQuery(problemId?: string, step?: number) {
+  const query: Record<string, string | string[] | null | undefined> = {
+    ...route.query,
+    topic: 'health',
+    source: context.source,
+    focus: selectedNodeId.value,
+    period: selectedPeriod.value,
+  }
+  if (problemId) {
+    query.problem = problemId
+    if (step) query.step = String(step)
+    else delete query.step
+  } else {
+    delete query.problem
+    delete query.step
+  }
+  return query
+}
+
+function replaceRoute(problemId?: string, step?: number) {
+  router.replace({ name: 'analysis', query: routeQuery(problemId, step) })
+}
+
+function pushRoute(problemId?: string, step?: number) {
+  router.push({ name: 'analysis', query: routeQuery(problemId, step) })
+}
 
 function selectNode(nodeId: LifecycleNodeId) {
   selectedNodeId.value = nodeId
-  const first = healthProblems.find((item) => item.nodeId === nodeId)
-  if (first) selectedProblemId.value = first.id
-  updateRoute()
+  replaceRoute()
 }
-function selectProblem(problem: HealthProblem) {
-  selectedNodeId.value = problem.nodeId
-  selectedProblemId.value = problem.id
-  recordNotice.value = ''
-  updateRoute()
-}
-function handleRoseSelect(payload: unknown) {
-  const nodeId = (payload as { nodeId?: LifecycleNodeId } | null)?.nodeId
-  if (nodeId) selectNode(nodeId)
-}
-function handleSecondarySelect(payload: unknown) {
-  const problemId = (payload as { problemId?: string } | null)?.problemId
-  const problem = problemId ? problemById.get(problemId) : null
-  if (problem) selectProblem(problem)
-}
-function updateRoute() {
-  router.replace({ name: 'analysis', query: { ...route.query, topic: 'health', source: context.source, mode: meetingMode.value, period: period.value, focus: selectedNodeId.value, problem: selectedProblemId.value } })
-}
-function updateDataState() {
-  if (dataState.value === 'loading') window.setTimeout(() => { if (dataState.value === 'loading') dataState.value = 'normal' }, 900)
-}
-function toggleCheck(id: string) {
-  selectedChecks.value = selectedChecks.value.includes(id) ? selectedChecks.value.filter((item) => item !== id) : [...selectedChecks.value, id]
-}
-function saveIntervention() {
-  recordNotice.value = ''
-  if (!conclusionsAllowed.value) return
-  if (!interventionForm.handler.trim() || !interventionForm.measure.trim() || !selectedChecks.value.length) {
-    recordNotice.value = '请填写处理人、实际措施，并至少选择一项已检查内容。'
-    return
-  }
-  records.value.unshift({ id: `IR-DEMO-${Date.now()}`, problemId: activeProblem.value.id, handler: `${interventionForm.handler.trim()}（演示）`, checkedItemIds: [...selectedChecks.value], actualMeasure: interventionForm.measure.trim(), handledAt: '2026-08-12 14:30', verifyAt: interventionForm.verifyAt, recurrenceResult: '待验证', isDemo: true })
-  recordNotice.value = '演示干预记录已保存，问题进入待验证状态；未下发正式任务。'
-  interventionForm.handler = ''
-  interventionForm.measure = ''
-  selectedChecks.value = []
-}
-function backToOverview() { router.push({ name: 'overview' }) }
 
-watch(() => route.query.problem, (value) => { if (typeof value === 'string' && problemById.has(value)) selectProblem(problemById.get(value)!) }, { immediate: true })
+function selectPeriod(period: PeriodKey) {
+  selectedPeriod.value = period
+  replaceRoute(viewMode.value === 'problem' ? activeProblem.value.id : undefined, problemPhase.value === 'analysis' ? analysisStepIndex.value + 1 : undefined)
+}
+
+function setPeriodMetric(metric: PeriodMetric) {
+  periodMetric.value = metric
+}
+
+function openProblem(problemId: string) {
+  const problem = problemById.get(problemId)
+  if (!problem || !canOpenRelation.value) return
+  selectedProblemId.value = problem.id
+  selectedNodeId.value = problem.nodeId
+  viewMode.value = 'problem'
+  problemPhase.value = 'relation'
+  analysisStepIndex.value = 0
+  selectedRelationNodeId.value = problem.id
+  pushRoute(problem.id)
+}
+
+function handleLifecycleSelect(payload: unknown) {
+  const data = payload as { nodeType?: string; nodeId?: LifecycleNodeId; problemId?: string } | null
+  if (data?.nodeType === 'issue' && data.problemId) openProblem(data.problemId)
+  else if (data?.nodeType === 'lifecycle' && data.nodeId) selectNode(data.nodeId)
+}
+
+function handlePeriodSelect(payload: unknown) {
+  const period = (payload as { period?: PeriodKey } | null)?.period
+  if (period && periodKeys.includes(period)) selectPeriod(period)
+}
+
+function handleProblemFocusSelect(payload: unknown) {
+  const data = payload as { id?: string; nodeType?: string } | null
+  if (data?.id && ['issue-focus', 'fact', 'context'].includes(data.nodeType ?? '')) selectedRelationNodeId.value = data.id
+}
+
+function enterAnalysis() {
+  if (!canShowRecommendations.value) return
+  problemPhase.value = 'analysis'
+  analysisStepIndex.value = 0
+  pushRoute(activeProblem.value.id, 1)
+}
+
+function goToStep(index: number) {
+  if (index < 0 || index >= analysisSteps.length || !canShowRecommendations.value && index > 0) return
+  analysisStepIndex.value = index
+  problemPhase.value = 'analysis'
+  pushRoute(activeProblem.value.id, index + 1)
+}
+
+function returnToFactory() {
+  viewMode.value = 'factory'
+  problemPhase.value = 'relation'
+  analysisStepIndex.value = 0
+  pushRoute()
+}
+
+function updateDataState() {
+  if (dataState.value === 'loading') {
+    window.setTimeout(() => {
+      if (dataState.value === 'loading') dataState.value = 'normal'
+    }, 900)
+  }
+  if (dataState.value !== 'normal' && problemPhase.value === 'analysis') {
+    problemPhase.value = 'relation'
+    analysisStepIndex.value = 0
+    replaceRoute(activeProblem.value.id)
+  }
+}
+
+function backToOverview() {
+  router.push({ name: 'overview' })
+}
+
+watch(() => [route.query.problem, route.query.step, route.query.period, route.query.focus], ([problemValue, stepValue, periodValue, focusValue]) => {
+  if (typeof periodValue === 'string' && periodKeys.includes(periodValue as PeriodKey)) selectedPeriod.value = periodValue as PeriodKey
+  if (typeof problemValue === 'string' && problemById.has(problemValue)) {
+    selectedProblemId.value = problemValue
+    selectedNodeId.value = problemById.get(problemValue)!.nodeId
+    viewMode.value = 'problem'
+    const step = Number(stepValue)
+    if (Number.isInteger(step) && step >= 1 && step <= 3) {
+      problemPhase.value = 'analysis'
+      analysisStepIndex.value = step - 1
+    } else {
+      problemPhase.value = 'relation'
+      analysisStepIndex.value = 0
+    }
+  } else {
+    viewMode.value = 'factory'
+    problemPhase.value = 'relation'
+    if (typeof focusValue === 'string') selectedNodeId.value = lifecycleById.has(focusValue as LifecycleNodeId) ? focusValue as LifecycleNodeId : legacyFocusMap[focusValue] ?? selectedNodeId.value
+  }
+})
 </script>
 
 <template>
-  <main class="v4-health-center">
-    <div class="v4-desktop-required"><strong>请使用桌面大屏查看</strong><span>V4健康体检与干预中心仅提供桌面端和大屏布局。</span></div>
-    <header class="v4-header">
-      <div class="v4-brand"><button type="button" @click="backToOverview">返回大屏</button><span /><div><small>GREEN AI · FACTORY HEALTH CONTROL</small><h1>工厂健康体检与干预中心</h1></div></div>
-      <nav aria-label="会议模式"><button type="button" :class="{ 'is-active': meetingMode === 'shift' }" @click="meetingMode = 'shift'; updateRoute()">班前会</button><button type="button" :class="{ 'is-active': meetingMode === 'daily' }" @click="meetingMode = 'daily'; updateRoute()">日会模式</button></nav>
-      <div class="v4-header-actions"><button type="button" @click="filtersOpen = !filtersOpen">筛选</button><VersionDialog /><span>演示数据</span><div><small>最近更新</small><strong>{{ activeNode.updatedAt }}</strong></div></div>
+  <main class="v4-data-cabin" :class="{ 'is-problem-focus': viewMode === 'problem' }">
+    <div class="v4-desktop-required"><strong>请使用桌面大屏查看</strong><span>V4.0.0 蓝白AI生命周期分析画布仅提供桌面端与大屏布局。</span></div>
+
+    <header class="v4-cabin-header">
+      <div class="v4-cabin-brand"><button type="button" @click="backToOverview">返回大屏</button><i /><div><small>GREEN AI · LIFECYCLE INTELLIGENCE</small><h1>工厂生命周期分析画布</h1></div></div>
+      <div class="v4-cabin-context"><button type="button" @click="filtersOpen = !filtersOpen">筛选条件</button><span>演示数据</span><VersionDialog /><div><small>数据更新时间</small><strong>{{ activeNode.updatedAt }}</strong></div></div>
     </header>
 
-    <Transition name="v4-filter"><section v-if="filtersOpen" class="v4-filter-ribbon"><div><span>入口</span><strong>{{ sourceLabel }}</strong></div><label><span>工厂</span><select v-model="context.factory"><option v-for="item in contextOptions.factories" :key="item">{{ item }}</option></select></label><label><span>产线</span><select v-model="context.line"><option v-for="item in contextOptions.lines" :key="item">{{ item }}</option></select></label><label><span>契约 / 品番</span><select v-model="context.contract"><option v-for="item in contextOptions.contracts" :key="item">{{ item }}</option></select></label><label><span>数据状态</span><select v-model="dataState" @change="updateDataState"><option v-for="(label, key) in dataStateLabelsV4" :key="key" :value="key">{{ label }}</option></select></label></section></Transition>
+    <Transition name="v4-filter"><section v-if="filtersOpen" class="v4-filter-ribbon"><div><span>进入来源</span><strong>{{ sourceLabel }}</strong></div><label><span>工厂</span><select v-model="context.factory"><option v-for="item in contextOptions.factories" :key="item">{{ item }}</option></select></label><label><span>产线</span><select v-model="context.line"><option v-for="item in contextOptions.lines" :key="item">{{ item }}</option></select></label><label><span>契约 / 品番</span><select v-model="context.contract"><option v-for="item in contextOptions.contracts" :key="item">{{ item }}</option></select></label><label><span>数据状态</span><select v-model="dataState" @change="updateDataState"><option v-for="(label, key) in dataStateLabelsV4" :key="key" :value="key">{{ label }}</option></select></label></section></Transition>
 
-    <section class="v4-executive-strip">
-      <div><small>MANAGEMENT CONCLUSION</small><strong>{{ visible ? activeProblem.title : unavailableCopy?.[0] }}</strong><span>{{ visible ? activeProblem.summary : unavailableCopy?.[1] }}</span></div>
-      <dl><div><dt>首要问题</dt><dd><strong>{{ visible ? activeProblem.problemType : '--' }}</strong><small>{{ visible ? activeNode.label : '暂不定位' }}</small></dd></div><div><dt>影响范围</dt><dd><strong>{{ visible ? `${activeProblem.impactValue} ${activeProblem.impactUnit}` : '--' }}</strong><small>{{ activeProblem.identity.styleNo }} / {{ activeProblem.identity.batch }}</small></dd></div><div><dt>较昨日变化</dt><dd><strong :class="activeProblem.changeFromYesterday > 0 ? 'is-danger' : 'is-good'">{{ visible ? `${activeProblem.changeFromYesterday > 0 ? '+' : ''}${activeProblem.changeFromYesterday}` : '--' }}</strong><small>相同统计口径</small></dd></div><div><dt>预警等级</dt><dd><strong>{{ visible ? latestAlert(activeProblem)?.levelLabel : '--' }}</strong><small>{{ visible ? activeProblem.responseStatus : '暂停判断' }}</small></dd></div><div><dt>优先方法</dt><dd><strong>{{ conclusionsAllowed ? activeProblem.inspectionItems[0]?.label : '等待数据恢复' }}</strong><small>{{ conclusionsAllowed ? '按标准检查顺序' : '不生成检查建议' }}</small></dd></div><div><dt>建议责任岗位</dt><dd><strong>{{ conclusionsAllowed ? activeProblem.suggestedRole : '暂不关联岗位' }}</strong><small>建议关联，待现场确认</small></dd></div></dl>
+    <section class="v4-conclusion-line" aria-label="老板结论">
+      <div class="v4-conclusion-heading"><small>EXECUTIVE CONCLUSION</small><strong>{{ canShowConclusion ? `${periodLabels[selectedPeriod]}首要管理结论` : unavailableCopy?.[0] }}</strong></div>
+      <dl><div><dt>首要问题</dt><dd>{{ canShowConclusion ? activeProblem.title : unavailableCopy?.[1] }}</dd></div><div><dt>影响范围</dt><dd>{{ canShowConclusion ? `${activeProblem.impactValue} ${activeProblem.impactUnit} · ${activeProblem.identity.batch}` : '--' }}</dd></div><div><dt>预警等级</dt><dd class="is-danger">{{ canShowConclusion ? latestAlert?.levelLabel : '--' }}</dd></div><div><dt>优先动作</dt><dd>{{ canShowConclusion ? '隔离批次，先核查设备与工艺参数' : '等待数据恢复' }}</dd></div><div><dt>建议岗位</dt><dd class="is-ai">{{ canShowConclusion ? activeProblem.suggestedRole : '暂不关联岗位' }}</dd></div></dl>
     </section>
 
-    <section class="v4-workspace">
-      <aside class="v4-problem-rail">
-        <header><div><small>INTERVENTION QUEUE</small><strong>待干预问题</strong></div><em>{{ visible ? `${healthProblems.length}项` : '--' }}</em></header>
-        <div class="v4-priority-filters"><span>三次警报</span><span>重复发生</span><span>超时/缺记录</span></div>
-        <ol v-if="visible"><li v-for="problem in displayedProblems" :key="problem.id" :class="[`is-${problem.severity}`, { 'is-active': activeProblem.id === problem.id }]" @click="selectProblem(problem)"><button type="button"><div><span>{{ lifecycleById.get(problem.nodeId)?.shortLabel }}</span><em>{{ latestAlert(problem)?.levelLabel }}</em></div><strong>{{ problem.title }}</strong><small>{{ problem.impactValue }} {{ problem.impactUnit }} · {{ problem.responseStatus }} · 连续{{ problem.identity.continuousCount }}次</small></button></li></ol>
-        <div v-else class="v4-unavailable"><strong>{{ unavailableCopy?.[0] }}</strong><span>{{ unavailableCopy?.[1] }}</span></div>
-        <section class="v4-actions"><header><strong>今日管理动作</strong><span>P1 / P2 / P3</span></header><button v-for="action in managementActions.slice(0, 4)" :key="action.id" type="button" @click="selectProblem(problemById.get(action.problemId)!)"><em :class="`is-${action.priority.toLowerCase()}`">{{ action.priority }}</em><span><strong>{{ action.action }}</strong><small>{{ action.suggestedRole }} · {{ action.expectedVerificationAt }}</small></span></button></section>
-      </aside>
+    <section class="v4-canvas-stage">
+      <div class="v4-stage-aura" aria-hidden="true" />
+      <header class="v4-stage-tools">
+        <div v-if="viewMode === 'factory'"><span class="is-active">全厂态势</span><i /><span>问题分析</span></div>
+        <div v-else-if="problemPhase === 'relation'" class="v4-relation-stage-label"><span>全厂态势</span><i /><span class="is-active">问题关联</span><i /><span>三步分析</span></div>
+        <nav v-else class="v4-step-indicator" aria-label="分析步骤"><button v-for="(step, index) in analysisSteps" :key="step.id" type="button" :class="{ 'is-active': index === analysisStepIndex, 'is-complete': index < analysisStepIndex }" :disabled="!canShowRecommendations && index > 0" @click="goToStep(index)"><small>{{ step.eyebrow }}</small><strong>{{ step.label }}</strong></button></nav>
+        <button v-if="viewMode === 'problem'" type="button" class="v4-return-factory" @click="returnToFactory">返回全厂</button>
+      </header>
 
-      <section class="v4-visual-stage">
-        <article class="v4-panel v4-rose-panel"><header><div><small>FACTORY HEALTH ROSE</small><strong>十节点健康风向玫瑰</strong></div><span>半径=影响指数 · 外圈=问题次数</span></header><div class="v4-chart-body"><EChart :option="roseOption" :state="chartState" @select="handleRoseSelect" /></div><footer><span>{{ activeNode.dataSource }}</span><small>{{ activeNode.coreMetric.definition }} · {{ period }} · {{ context.factory }}</small></footer></article>
-        <nav class="v4-lifecycle-strip" aria-label="生命周期节点"><button v-for="node in lifecycleNodes" :key="node.id" type="button" :class="[`is-${node.health}`, { 'is-active': node.id === selectedNodeId }]" @click="selectNode(node.id)"><i /><span>{{ String(node.order).padStart(2, '0') }}</span><strong>{{ node.shortLabel }}</strong><small>{{ node.issueCount }}次</small></button></nav>
-        <article class="v4-panel v4-evidence-panel"><header><div><small>MANAGEMENT EVIDENCE</small><strong>{{ secondaryTitle }}</strong></div><nav><button v-for="item in [{ id:'compare',label:'周期对比'},{id:'pareto',label:'Pareto'},{id:'trend',label:'干预趋势'},{id:'funnel',label:'闭环漏斗'}]" :key="item.id" type="button" :class="{ 'is-active': evidenceView === item.id }" @click="evidenceView = item.id as typeof evidenceView">{{ item.label }}</button></nav></header><div v-if="evidenceView === 'compare'" class="v4-metric-switch"><button v-for="item in [{id:'count',label:'问题次数'},{id:'impact',label:'影响数量'},{id:'duration',label:'平均处理时长'}]" :key="item.id" type="button" :class="{ 'is-active': metric === item.id }" @click="metric = item.id as typeof metric">{{ item.label }}</button></div><div class="v4-chart-body"><EChart :option="secondaryOption" :state="chartState" @select="handleSecondarySelect" /></div><footer><span>演示：MES / WMS / 质量 / 干预记录</span><small>统计口径随图表切换常驻显示 · {{ period }} · {{ context.line }}</small></footer></article>
+      <template v-if="viewMode === 'factory'">
+        <div class="v4-lifecycle-chart v4-lifecycle-chart--factory"><EChart :option="lifecycleOption" :state="chartState" @select="handleLifecycleSelect" /></div>
+        <button v-if="canOpenRelation" type="button" class="v4-issue-beacon" aria-label="查看缝皱不良第三次警报" @click="openProblem('P-QA-01')"><span>严重异常 · 第三次警报</span><strong>缝皱不良</strong><small>46 pcs · 自动进入待干预流程态</small></button>
+        <section class="v4-period-rail">
+          <header><div><small>MULTI-PERIOD COMPARISON</small><strong>四周期态势对比</strong></div><nav><button v-for="(label, metric) in periodMetricLabels" :key="metric" type="button" :class="{ 'is-active': periodMetric === metric }" @click="setPeriodMetric(metric)">{{ label }}</button></nav></header>
+          <div class="v4-period-chart"><EChart :option="periodOption" :state="chartState" @select="handlePeriodSelect" /></div>
+          <footer><button v-for="item in periodData" :key="item.period" type="button" :class="{ 'is-active': selectedPeriod === item.period }" @click="selectPeriod(item.period)"><strong>{{ item.label }}</strong><span>{{ item.currentValue }}{{ item.unit }}</span><em :class="item.changeRate > 0 ? 'is-up' : 'is-down'">{{ item.changeRate > 0 ? '+' : '' }}{{ item.changeRate }}%</em></button></footer>
+        </section>
+      </template>
+
+      <template v-else-if="problemPhase === 'relation'">
+        <div class="v4-lifecycle-chart v4-lifecycle-chart--relation"><EChart :option="problemFocusOption" :state="chartState" @select="handleProblemFocusSelect" /></div>
+        <aside class="v4-focus-summary" aria-live="polite">
+          <span>{{ selectedRelationDetail.status }}</span>
+          <strong>{{ selectedRelationDetail.label }}</strong>
+          <small>{{ selectedRelationDetail.source }}</small>
+          <p>{{ selectedRelationDetail.detail }}</p>
+          <em>当前仅展示已记录事实与待确认追溯范围，不认定根因。</em>
+          <button type="button" :disabled="!canShowRecommendations" @click="enterAnalysis">进入三步分析</button>
+          <small v-if="!canShowRecommendations" class="v4-relation-disabled">{{ dataState === 'stale' ? '数据已过期，结论复核前不可进入建议分析' : '数据恢复后可进入建议分析' }}</small>
+        </aside>
+      </template>
+
+      <section v-else class="v4-analysis-canvas">
+        <div v-if="!canShowRecommendations" class="v4-analysis-paused"><strong>{{ unavailableCopy?.[0] }}</strong><p>{{ unavailableCopy?.[1] }}</p><span>当前只保留生命周期与已记录事实，不生成候选原因、方案、岗位或员工素质建议。</span></div>
+
+        <template v-else-if="analysisStepIndex === 0">
+          <article class="v4-analysis-main"><header><div><small>RECORDED FACTS</small><h2>不良率趋势与三次预警事件</h2></div><span>48小时滚动窗口 · 连续采样去重</span></header><div class="v4-analysis-chart"><EChart :option="evidenceTrendOption" :state="chartState" /></div><footer>来源：演示QC2-1检验记录 · 单位：% · 时间：今日08:00-14:00 · 阈值：单窗口&gt;2.0%</footer></article>
+          <aside class="v4-analysis-side">
+            <section class="v4-alert-progression"><header><small>ALERT PROGRESSION</small><strong>三级预警状态</strong></header><ol><li v-for="(level, index) in alertRuleConfig.levels" :key="level.level" :class="{ 'is-active': index === 2 }"><em>{{ level.occurrence }}</em><div><strong>{{ level.label }}</strong><span>{{ level.action }}</span></div></li></ol><p>{{ alertRuleConfig.windowHours }}小时内按同一问题身份证累计；连续异常采样只计一次。</p></section>
+            <section class="v4-identity-facts"><span>问题身份证</span><strong>{{ activeProblem.identity.styleNo }} / {{ activeProblem.identity.batch }}</strong><small>{{ activeProblem.identity.station }} · {{ activeProblem.identity.timeWindow }}</small><dl><div v-for="fact in activeProblem.facts" :key="fact.label"><dt>{{ fact.label }}</dt><dd>{{ fact.value }}</dd></div></dl></section>
+            <section class="v4-mini-period"><header><strong>四周期证据</strong><nav><button v-for="(label, metric) in periodMetricLabels" :key="metric" type="button" :class="{ 'is-active': periodMetric === metric }" @click="setPeriodMetric(metric)">{{ label }}</button></nav></header><div><EChart :option="periodOption" :state="chartState" @select="handlePeriodSelect" /></div></section>
+          </aside>
+        </template>
+
+        <template v-else-if="analysisStepIndex === 1">
+          <article class="v4-analysis-main"><header><div><small>EXPLAINABLE ANALYSIS</small><h2>候选原因证据矩阵</h2></div><span class="is-pending">全部待现场确认</span></header><div class="v4-analysis-chart"><EChart :option="candidateEvidenceOption" :state="chartState" /></div><footer>证据完整度不等于因果置信度 · 绿色AI只推荐检查顺序，不认定根因</footer></article>
+          <aside class="v4-analysis-side v4-analysis-side--solution">
+            <section class="v4-solution-chart"><header><div><small>ACTION PRIORITY</small><strong>方案优先级</strong></div><span>气泡=数据条件</span></header><div><EChart :option="actionPriorityOption" :state="chartState" /></div></section>
+            <section class="v4-check-sequence"><header><strong>建议检查顺序</strong><span>非正式任务</span></header><ol><li v-for="(item, index) in actionCandidates.slice(0, 3)" :key="item.id"><em>{{ index + 1 }}</em><div><strong>{{ item.label }}</strong><small>{{ item.category }} · 验证约{{ item.verificationHours }}小时 · 数据{{ item.dataReadiness }}%</small></div></li></ol><p>人员类候选证据完整度不足，不生成员工责任结论。</p></section>
+          </aside>
+        </template>
+
+        <template v-else>
+          <article class="v4-analysis-main"><header><div><small>MANAGEMENT EFFECTIVENESS</small><h2>厂长干预效能 × 改善稳定度</h2></div><span>按问题闭环案例，不评价个人排名</span></header><div class="v4-analysis-chart"><EChart :option="managementOption" :state="chartState" /></div><footer>横轴=厂长响应时长 · 纵轴=验证后无复发天数 · 同期关系，不代表已验证因果关系</footer></article>
+          <aside class="v4-analysis-side v4-analysis-side--validation">
+            <section class="v4-intervention-state"><header><small>AUTO INTERVENTION STATE</small><strong>系统警报已启动待干预流程</strong></header><dl><div><dt>流程状态</dt><dd>待干预</dd></div><div><dt>建议岗位</dt><dd>{{ currentInterventionCase.suggestedRole }}</dd></div><div><dt>协调动作</dt><dd>{{ currentInterventionCase.coordinationActionsCompleted }}/{{ currentInterventionCase.coordinationActionsTotal }}</dd></div><div><dt>证据完整度</dt><dd>{{ currentInterventionCase.evidenceCompleteness }}%</dd></div></dl><p>仅生成检查顺序、建议岗位和验证窗口；未正式派单或发送消息。</p></section>
+            <section class="v4-validation-timeline"><header><strong>验证时间轴</strong><span>7 / 30 / 90天</span></header><div><EChart :option="validationTimelineOption" :state="chartState" /></div></section>
+            <section class="v4-stability-status"><div><span>系统改善稳定度</span><strong>{{ currentStabilityAssessment.label }}</strong><small>{{ currentStabilityAssessment.reason }}</small></div><div><span>员工素质等级建议</span><strong>{{ currentEmployeeQualitySuggestion.label }}</strong><small>{{ currentEmployeeQualitySuggestion.reason }}</small></div><em>厂长复核状态：尚不适用 · 只读展示</em></section>
+          </aside>
+        </template>
       </section>
 
-      <aside class="v4-intervention-terminal">
-        <header><div><small>INTERVENTION TERMINAL</small><strong>问题干预</strong></div><span>{{ conclusionsAllowed ? '推荐检查顺序' : '结论暂停' }}</span></header>
-        <nav><button v-for="item in [{id:'diagnosis',label:'诊断'},{id:'record',label:'记录干预'},{id:'recurrence',label:'复发'},{id:'effectiveness',label:'措施库'},{id:'duty',label:'履职事实'}]" :key="item.id" type="button" :class="{ 'is-active': interventionTab === item.id }" @click="interventionTab = item.id as typeof interventionTab">{{ item.label }}</button></nav>
-        <div v-if="!conclusionsAllowed" class="v4-terminal-paused"><strong>{{ unavailableCopy?.[0] }}</strong><p>{{ unavailableCopy?.[1] }}</p><span>当前仅保留必要状态说明，不展示原因、方案或责任关联。</span></div>
-        <div v-else-if="interventionTab === 'diagnosis'" class="v4-terminal-scroll"><section><header><strong>事实与证据</strong><span>已记录事实</span></header><div class="v4-facts"><p v-for="fact in activeProblem.facts" :key="fact.label"><span>{{ fact.label }}</span><strong>{{ fact.value }}</strong><small>{{ fact.source }}</small></p></div></section><section><header><strong>问题身份证</strong><span>{{ activeProblem.identity.recurrenceState }}</span></header><dl class="v4-identity"><div><dt>问题类型</dt><dd>{{ activeProblem.identity.problemType }}</dd></div><div><dt>款号 / 批次</dt><dd>{{ activeProblem.identity.styleNo }} / {{ activeProblem.identity.batch }}</dd></div><div><dt>设备 / 工位</dt><dd>{{ activeProblem.identity.station }}</dd></div><div><dt>时间窗口</dt><dd>{{ activeProblem.identity.timeWindow }}</dd></div></dl></section><section><header><strong>标准检查清单</strong><span>AI仅推荐顺序</span></header><ol class="v4-check-list"><li v-for="(item, index) in activeProblem.inspectionItems" :key="item.id"><em>{{ index + 1 }}</em><div><strong>{{ item.category }} · {{ item.label }}</strong><p>{{ item.method }}</p><small>需留证：{{ item.requiredEvidence }}</small></div></li></ol></section><section><header><strong>方案预案</strong><span>未正式下发</span></header><ol class="v4-plan"><li v-for="item in activeProblem.plan" :key="item">{{ item }}</li></ol></section><section class="v4-owner"><div><span>建议责任</span><strong>{{ activeProblem.suggestedDepartment }}</strong><small>{{ activeProblem.suggestedRole }} · 待现场确认</small></div><div><span>验证要求</span><strong>{{ activeProblem.verificationRequirement }}</strong></div></section><section><header><strong>反向追溯</strong><span>{{ activeProblem.traceConfirmation === 'confirmed' ? '关系已记录' : '待现场确认' }}</span></header><div class="v4-trace"><span v-for="nodeId in activeProblem.traceNodeIds" :key="nodeId">{{ lifecycleById.get(nodeId)?.shortLabel }}</span></div></section></div>
-        <div v-else-if="interventionTab === 'record'" class="v4-terminal-scroll v4-record-form"><p>仅保存前端演示记录，不下发正式任务。</p><label><span>处理人 / 岗位</span><input v-model="interventionForm.handler" placeholder="请输入演示处理人" /></label><fieldset><legend>已完成检查项</legend><button v-for="item in activeProblem.inspectionItems" :key="item.id" type="button" :class="{ 'is-active': selectedChecks.includes(item.id) }" @click="toggleCheck(item.id)"><i />{{ item.category }} · {{ item.label }}</button></fieldset><label><span>实际措施</span><textarea v-model="interventionForm.measure" placeholder="记录实际采取的措施，不填写推定根因" /></label><label><span>计划验证时间</span><input v-model="interventionForm.verifyAt" /></label><button class="v4-save-record" type="button" @click="saveIntervention">保存演示干预记录</button><strong v-if="recordNotice" class="v4-record-notice">{{ recordNotice }}</strong></div>
-        <div v-else-if="interventionTab === 'recurrence'" class="v4-terminal-scroll"><section><header><strong>预警与复发时间轴</strong><span>{{ activeProblem.identity.firstOccurredAt }}</span></header><ol class="v4-timeline"><li v-for="event in activeProblem.alertEvents" :key="event.id"><time>{{ event.occurredAt }}</time><i /><div><strong>{{ event.levelLabel }}</strong><p>{{ event.triggerRule }}</p><small>{{ event.threshold }} · {{ event.evidence }}</small></div></li><li v-for="record in activeRecords" :key="record.id" class="is-intervention"><time>{{ record.handledAt.slice(-5) }}</time><i /><div><strong>已记录干预 · {{ record.handler }}</strong><p>{{ record.actualMeasure }}</p><small>验证：{{ record.verifyAt }} · {{ record.recurrenceResult }}</small></div></li></ol></section></div>
-        <div v-else-if="interventionTab === 'effectiveness'" class="v4-terminal-scroll"><section><header><strong>措施有效性库</strong><span>只计算有真实处理记录项</span></header><article v-if="activeEffectiveness.length" v-for="item in activeEffectiveness" :key="item.id" class="v4-effect"><strong>{{ item.measure }}</strong><template v-if="item.baselineStatus === 'available'"><dl><div><dt>使用次数</dt><dd>{{ item.usageCount }}</dd></div><div><dt>未复发次数</dt><dd>{{ item.nonRecurrenceCount }}</dd></div><div><dt>平均复发间隔</dt><dd>{{ item.averageRecurrenceInterval }}</dd></div></dl></template><p v-else>待建立验证基线，不计算有效率。</p><small>适用：{{ item.applicableConditions.join('；') }}</small></article><div v-else class="v4-empty-detail">当前问题类型尚无可计算的历史措施记录。</div></section></div>
-        <div v-else class="v4-terminal-scroll"><section><header><strong>履职事实</strong><span>不评价能力或态度</span></header><div class="v4-duty-grid"><article v-for="item in dutyFacts" :key="item.label"><span>{{ item.label }}</span><strong>{{ item.count }}</strong><small>{{ item.definition }}</small></article></div></section></div>
-      </aside>
+      <nav v-if="viewMode === 'problem' && problemPhase === 'analysis' && canShowRecommendations" class="v4-manual-controls" aria-label="手动分析控制"><button type="button" :disabled="analysisStepIndex === 0" @click="goToStep(analysisStepIndex - 1)">上一步</button><span>{{ activeStep.eyebrow }} · {{ activeStep.label }}</span><button type="button" :disabled="analysisStepIndex === analysisSteps.length - 1" @click="goToStep(analysisStepIndex + 1)">下一步</button></nav>
+      <footer class="v4-stage-source"><span>数据来源：{{ stageSource }}</span><small>统计口径：{{ viewMode === 'factory' ? periodData.find((item) => item.period === selectedPeriod)?.definition : problemPhase === 'relation' ? '同款、同批次、同问题类型与追溯范围；待确认关系不视为因果' : analysisStepIndex === 0 ? '同问题身份证，48小时滚动累计；连续异常采样去重' : analysisStepIndex === 1 ? '候选原因均待现场确认，不认定因果' : '按问题闭环案例统计，不形成厂长个人评分' }} · {{ context.factory }} · {{ context.line }}</small></footer>
     </section>
 
-    <footer class="v4-bottom-dock"><nav><button v-for="item in periodOptions" :key="item" type="button" :class="{ 'is-active': period === item }" @click="period = item; updateRoute()">{{ item }}</button></nav><div><strong>{{ activeActions[0]?.action ?? '当前问题暂无单独管理动作' }}</strong><span>{{ activeActions[0]?.triggerBasis ?? '查看标准检查清单与验证要求' }}</span></div><dl><div><dt>状态流</dt><dd>提示 → 加强 → 警报 → 干预 → 验证</dd></div><div><dt>产品边界</dt><dd>建议预案 · 非正式任务</dd></div></dl></footer>
+    <footer class="v4-cabin-footer"><div><i /><span>冷青：数据事实</span><i class="is-ai" /><span>翡翠绿：AI建议</span><i class="is-pending" /><span>琥珀：待确认</span><i class="is-danger" /><span>红色：严重异常</span></div><strong>抽象演示画布 · 不代表松冈真实生产或人员评价结论</strong></footer>
   </main>
 </template>
 
