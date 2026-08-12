@@ -19,16 +19,164 @@ export interface VersionRelease {
   changes: readonly VersionChange[]
 }
 
-export const CURRENT_PRODUCT_VERSION = 'v2.0.0'
+export const CURRENT_PRODUCT_VERSION = 'v4.0.0'
 
 // Future versions are added here manually together with their routes and append-only changes.
 export const versionHistory: readonly VersionRelease[] = [
   {
+    version: 'v4.0.0',
+    releasedAt: '2026-08-12',
+    title: '蓝白AI生命周期分析画布',
+    status: 'current',
+    prototypeRoutes: { overview: 'overview', analysis: 'analysis' },
+    highlights: [
+      '以全屏十节点生命周期流图替代三栏管理后台，管理结论与问题状态在同一分析画布中呈现。',
+      '覆盖订单计划至成品仓的十个可管理生命周期节点，并排除无法取得数据的海运、码头与清关环节。',
+      '采用珍珠白、冷青、翡翠绿、琥珀和异常红构成蓝白未来数据舱视觉。',
+      '增加昨日、今日、本周、本月四周期同屏对比，并支持问题次数、影响量和平均响应时长切换。',
+      '点击第三次警报后先查看事实关联总览，再进入三步手动分析链，展示证据、候选原因、建议方案、责任验证和管理干预效能。',
+    ],
+    boundaries: [
+      '第一阶段仅基于现有MES、计划、仓库和质量数据制作前端演示，不连接真实绿色AI模型。',
+      '采购备料指标必须具备采购订单、预计到料和实收入库数据后才能在生产环境形成。',
+      '检查顺序、方案预案和责任岗位均为建议，未实现正式任务分派、消息推送、干预录入或关闭流程。',
+      '员工素质只提供待厂长复核的等级建议；缺少验证、措施或证据时不生成建议，不写入正式人事档案。',
+      'V4仅提供桌面端与大屏布局，不制作手机端。',
+    ],
+    changes: [
+      {
+        id: 'v4-lifecycle-canvas',
+        changedAt: '2026-08-12',
+        category: '整体形式',
+        title: '重构为蓝白生命周期分析画布',
+        description: '取消三栏管理后台与卡片墙，以全屏生命周期流图承载全厂态势和问题聚焦。',
+      },
+      {
+        id: 'v4-lifecycle',
+        changedAt: '2026-08-12',
+        category: '生命周期',
+        title: '建立十节点生命周期流图',
+        description: '覆盖订单计划、采购备料、原料仓、生产、品质、包装和成品仓出货，不包含不可取得数据的海运、码头与清关。',
+      },
+      {
+        id: 'v4-manual-focus',
+        changedAt: '2026-08-12',
+        category: '问题下钻',
+        title: '建立三步手动问题分析链',
+        description: '点击第三次警报后按问题证据、原因方案、责任验证三个步骤完成讲解，不自动推进。',
+      },
+      {
+        id: 'v4-period-alert-effectiveness',
+        changedAt: '2026-08-12',
+        category: '周期与管理效能',
+        title: '新增四周期、三级预警和稳定度评价',
+        description: '使用48小时滚动累计触发三级预警，并以7、30、90天无复发观察管理干预后的改善稳定度。',
+      },
+      {
+        id: 'v4-problem-relation-overview',
+        changedAt: '2026-08-12',
+        category: '问题下钻',
+        title: '恢复缝皱问题事实关联总览',
+        description: '点击缝皱第三次警报后先展示生命周期位置、追溯范围和已记录事实，再由用户手动进入三步分析链。',
+      },
+    ],
+  },
+  {
+    version: 'v3.0.0',
+    releasedAt: '2026-08-12',
+    title: '图表化AI动态问题驾驶舱',
+    status: 'archived',
+    prototypeRoutes: { overview: 'v3-overview', analysis: 'v3-analysis' },
+    highlights: [
+      '以老板现场客户讲解为主线，首屏直接呈现问题、影响、依据、措施和建议责任岗位。',
+      '按六个讲解章节编排十四类ECharts图表，支持问题、工序、证据与措施联动。',
+      '增加78秒自动演示、手动章节控制、预设措施组合和改善前后演示模拟。',
+      '采用明亮AI科技风格，使用程序化光球、受控粒子、渐变、霓虹关系线和玻璃图表层。',
+    ],
+    boundaries: [
+      '全部图表、分析结论和改善结果均为演示数据，不代表松冈真实生产结论或预测结果。',
+      '相关性与AI假设必须由客户现场数据和责任岗位复核，不作为已确认因果。',
+      'V3仅提供桌面端与大屏布局，不制作手机端。',
+      '未连接真实生产接口、模型服务、任务分派或消息闭环。',
+    ],
+    changes: [
+      {
+        id: 'v3-chart-cockpit',
+        changedAt: '2026-08-12',
+        category: '问题驾驶舱',
+        title: '升级为图表化AI问题驾驶舱',
+        description: '围绕管理态势、问题定位、数据证据、原因分析、方案模拟和责任验证重构分析页。',
+      },
+      {
+        id: 'v3-chart-story',
+        changedAt: '2026-08-12',
+        category: '图表与动效',
+        title: '新增十四类图表与78秒讲解故事线',
+        description: '按章节延迟加载图表，并实现问题、时间窗口和改善状态的平滑联动。',
+      },
+      {
+        id: 'v3-ai-visual',
+        changedAt: '2026-08-12',
+        category: 'AI视觉',
+        title: '采用明亮AI科技视觉',
+        description: '增加程序化光球、受控粒子、渐变背景、局部霓虹和半透明玻璃图表层。',
+      },
+    ],
+  },
+  {
+    version: 'v2.1.0',
+    releasedAt: '2026-08-11',
+    title: 'AI工业微缩工厂',
+    status: 'archived',
+    prototypeRoutes: { overview: 'v21-overview', analysis: 'v21-analysis' },
+    highlights: [
+      '将九类工序岛升级为具有独立机构、物料接口和物流方向的程序化工业模型。',
+      '新增业务状态驱动的语义物流、瓶颈传播、AI诊断链和改善恢复模拟。',
+      '新增曲线路径镜头导演、选中节点自动取景和大屏选择性辉光。',
+      '完整保留V2.0.0与V1.0.0历史产品原型并支持直接切换。',
+    ],
+    boundaries: [
+      '三维场景和改善结果均为演示模拟，不代表松冈真实设备、厂区或生产预测。',
+      '瓶颈传播仅表达同期关联与AI假设，必须由现场数据和人员复核。',
+      '未连接真实生产接口、CPU小模型服务、任务分派或消息闭环。',
+    ],
+    changes: [
+      {
+        id: 'v21-semantic-motion',
+        changedAt: '2026-08-11',
+        category: '业务动效',
+        title: '以业务状态驱动三维生产态势',
+        description: '新增语义物流、队列堆积、下游等料、AI诊断阶段和改善恢复模拟。',
+      },
+      {
+        id: 'v21-industrial-models',
+        changedAt: '2026-08-11',
+        category: '工业建模',
+        title: '升级九类程序化工序模型',
+        description: '使用共享工业组件、独立工序轮廓和明确输入输出接口增强识别度。',
+      },
+      {
+        id: 'v21-cinematic-rendering',
+        changedAt: '2026-08-11',
+        category: '镜头与画质',
+        title: '新增镜头导演与选择性辉光',
+        description: '引导模式采用曲线路径与自动取景，大屏只对AI路径和当前节点使用选择性辉光。',
+      },
+      {
+        id: 'v21-scene-readability',
+        changedAt: '2026-08-11',
+        category: '视觉可读性',
+        title: '提升深色场景的设备辨识度',
+        description: '提升环境补光、工业材质、地坪网格与信息轨道对比度，同时保留异常状态色和选择性辉光层级。',
+      },
+    ],
+  },
+  {
     version: 'v2.0.0',
     releasedAt: '2026-08-11',
     title: '三维生产指挥舱',
-    status: 'current',
-    prototypeRoutes: { overview: 'overview', analysis: 'analysis' },
+    status: 'archived',
+    prototypeRoutes: { overview: 'v2-overview', analysis: 'v2-analysis' },
     highlights: [
       '新增九类纯 Three.js 程序化未来微缩工厂节点，支持工序聚焦、旋转、缩放和机构动画。',
       '新增90秒效率与质量联动演示，支持暂停、跳转、重播和自由探索。',

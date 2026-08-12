@@ -19,6 +19,7 @@ const severityColor = {
 }
 
 const axis = {
+  alignTicks: false,
   axisLine: { lineStyle: { color: 'rgba(180, 203, 213, 0.2)' } },
   axisTick: { show: false },
   axisLabel: { color: colors.muted, fontSize: 11 },
