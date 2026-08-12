@@ -4,7 +4,7 @@
 
 ## 版本与访问
 
-- 当前开发版本：`V4.0.0`（尚未推送或部署）
+- 当前开发版本：`V4.0.0`（尚未部署）
 - 已部署在线演示：<https://qinburi.github.io/matsuoka-green-ai-operations-screen/>
 - 当前本地分析页：`/#/analysis`
 - V3 历史原型：`/#/v3/`
