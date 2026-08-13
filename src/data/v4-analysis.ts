@@ -142,8 +142,38 @@ export const problemAnalysisProfiles: Record<string, ProblemAnalysisProfile> = {
   },
 }
 
-export function getProblemAnalysisProfile(problemId: string): ProblemAnalysisProfile {
-  return problemAnalysisProfiles[problemId] ?? problemAnalysisProfiles['P-QA-01']
+export function getProblemAnalysisProfile(problem: HealthProblem | string): ProblemAnalysisProfile {
+  const problemId = typeof problem === 'string' ? problem : problem.id
+  const configured = problemAnalysisProfiles[problemId]
+  if (configured) return configured
+  if (typeof problem === 'string') return problemAnalysisProfiles['P-QA-01']
+
+  const categories = ['设备', '物料', '工艺', '人员', '管理']
+  return {
+    problemId: problem.id,
+    evidence: {
+      title: `${problem.problemType}事实趋势与预警事件`,
+      metricLabel: problem.facts[0]?.label ?? '影响数量',
+      unit: problem.impactUnit,
+      threshold: problem.alertEvents[problem.alertEvents.length - 1]?.threshold ?? '待确认',
+      source: problem.facts.map((fact) => fact.source).join(' / '),
+      labels: ['08:00', '09:00', '10:00', '11:00', '12:00', '13:00', '14:00'],
+      values: [0.42, 0.55, 0.48, 0.66, 0.72, 0.88, 1].map((ratio) => Math.max(1, Math.round(problem.impactValue * ratio))),
+    },
+    candidateEvidence: categories.map((category, index) => {
+      const item = problem.inspectionItems.find((candidate) => candidate.category === category)
+      return { category, label: item?.label ?? `${category}类数据待补充`, completeness: item ? 64 - index * 4 : 28, priority: item ? 82 - index * 5 : 36, dataCondition: item ? 58 - index * 3 : 22 }
+    }),
+    actionCandidates: problem.inspectionItems.slice(0, 5).map((item, index) => ({
+      id: `${problem.id}-AC-${index + 1}`,
+      label: item.label,
+      category: item.category,
+      difficulty: 24 + index * 9,
+      impact: Math.max(42, 86 - index * 8),
+      verificationHours: Math.max(1, index + 1),
+      dataReadiness: Math.max(38, 72 - index * 6),
+    })),
+  }
 }
 
 export function getInterventionCaseForProblem(problem: HealthProblem): InterventionCase {

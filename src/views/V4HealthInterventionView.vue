@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, reactive, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import EChart from '../components/EChart.vue'
 import VersionDialog from '../components/VersionDialog.vue'
@@ -18,6 +18,15 @@ import {
 } from '../data/v4-analysis'
 import { dataStateLabelsV4, healthProblems, lifecycleById, lifecycleNodes, problemById } from '../data/v4-health-center'
 import {
+  closureStatusLabels,
+  closureStatusSymbols,
+  createEmptyInterventionDraft,
+  deriveProblemClosureStatus,
+  isVerifiedDraftComplete,
+  loadInterventionDrafts,
+  persistInterventionDrafts,
+} from '../data/v4-problem-closure'
+import {
   buildActionPriorityOption,
   buildCandidateEvidenceOption,
   buildEvidenceTrendOption,
@@ -27,7 +36,20 @@ import {
   buildProblemFocusOption,
   buildValidationTimelineOption,
 } from '../v4-chart-options'
-import type { AnalysisStep, DataState, LifecycleNodeId, PeriodKey, PeriodMetric, ProblemDisplayPhase } from '../types'
+import type {
+  AnalysisStep,
+  DataState,
+  HealthProblem,
+  InterventionDraft,
+  InterventionEditorRole,
+  LifecycleNodeId,
+  PeriodKey,
+  PeriodMetric,
+  ProblemClosureFilter,
+  ProblemClosureStatus,
+  ProblemDisplayPhase,
+  ProblemListScope,
+} from '../types'
 
 const route = useRoute()
 const router = useRouter()
@@ -53,6 +75,41 @@ const requestedStep = Number(route.query.step)
 const analysisStepIndex = ref(Number.isInteger(requestedStep) && requestedStep >= 1 && requestedStep <= 3 ? requestedStep - 1 : 0)
 const problemPhase = ref<ProblemDisplayPhase>(viewMode.value === 'problem' && Number.isInteger(requestedStep) && requestedStep >= 1 && requestedStep <= 3 ? 'analysis' : 'relation')
 const selectedRelationNodeId = ref<string>(requestedProblem ?? 'P-QA-01')
+const problemListScope = ref<ProblemListScope>('node')
+const problemListFilter = ref<ProblemClosureFilter>('all')
+const editorRole = ref<InterventionEditorRole>('factory-manager')
+const interventionDrafts = ref<Record<string, InterventionDraft>>(loadInterventionDrafts())
+const editingProblemId = ref<string | null>(null)
+const interventionForm = reactive<InterventionDraft>(createEmptyInterventionDraft(''))
+const interventionFormError = ref('')
+const motionEnabled = ref(true)
+let motionPreference: MediaQueryList | null = null
+const syncMotionPreference = (event?: MediaQueryListEvent) => {
+  motionEnabled.value = !(event?.matches ?? motionPreference?.matches ?? false)
+}
+
+onMounted(() => {
+  motionPreference = window.matchMedia('(prefers-reduced-motion: reduce)')
+  syncMotionPreference()
+  motionPreference.addEventListener('change', syncMotionPreference)
+})
+
+onBeforeUnmount(() => {
+  motionPreference?.removeEventListener('change', syncMotionPreference)
+})
+
+const closureFilters: Array<{ id: ProblemClosureFilter; label: string }> = [
+  { id: 'all', label: '全部' },
+  { id: 'pending', label: '待处理' },
+  { id: 'processing', label: '处理中' },
+  { id: 'verified', label: '已解决' },
+  { id: 'recurred', label: '再次复发' },
+]
+const editorRoleLabels: Record<InterventionEditorRole, string> = {
+  'factory-manager': '厂长（演示）',
+  'department-owner': '责任部门负责人（演示）',
+  viewer: '查看者（只读）',
+}
 
 const analysisSteps: Array<{ id: AnalysisStep; label: string; eyebrow: string }> = [
   { id: 'evidence', label: '问题与证据', eyebrow: 'STEP 01' },
@@ -61,7 +118,9 @@ const analysisSteps: Array<{ id: AnalysisStep; label: string; eyebrow: string }>
 ]
 const activeNode = computed(() => lifecycleById.get(selectedNodeId.value) ?? lifecycleNodes[7])
 const activeProblem = computed(() => problemById.get(selectedProblemId.value) ?? healthProblems[0])
-const analysisProfile = computed(() => getProblemAnalysisProfile(activeProblem.value.id))
+const activeClosureDraft = computed(() => interventionDrafts.value[activeProblem.value.id])
+const activeClosureStatus = computed(() => deriveProblemClosureStatus(activeProblem.value, activeClosureDraft.value))
+const analysisProfile = computed(() => getProblemAnalysisProfile(activeProblem.value))
 const activeInterventionCase = computed(() => getInterventionCaseForProblem(activeProblem.value))
 const activeStabilityAssessment = computed(() => activeProblem.value.id === 'P-QA-01'
   ? currentStabilityAssessment
@@ -70,7 +129,12 @@ const employeeSuggestion = computed(() => activeProblem.value.id === 'P-QA-01'
   ? currentEmployeeQualitySuggestion
   : { ...currentEmployeeQualitySuggestion, caseId: activeInterventionCase.value.id, reason: '当前尚未完成干预验证，观察尚未开始；系统不得形成员工素质结论。' })
 const latestAlert = computed(() => activeProblem.value.alertEvents[activeProblem.value.alertEvents.length - 1])
-const priorityAction = computed(() => activeProblem.value.plan[0] ?? '先核对问题事实与数据口径')
+const currentAlertLabel = computed(() => activeClosureStatus.value === 'verified'
+  ? '已解决 · 验证通过'
+  : activeClosureStatus.value === 'recurred' ? '再次复发' : latestAlert.value?.levelLabel)
+const priorityAction = computed(() => activeClosureStatus.value === 'verified'
+  ? '保持观察并监测同类问题复发'
+  : activeProblem.value.plan[0] ?? '先核对问题事实与数据口径')
 const sourceLabel = computed(() => sourceLabels[context.source] ?? '综合入口')
 const chartState = computed(() => dataState.value)
 const canShowConclusion = computed(() => dataState.value === 'normal')
@@ -78,7 +142,7 @@ const canOpenRelation = computed(() => dataState.value === 'normal' || dataState
 const canShowRecommendations = computed(() => dataState.value === 'normal')
 const activeStep = computed(() => analysisSteps[analysisStepIndex.value])
 const periodData = computed(() => buildPeriodComparisons(activeNode.value, periodMetric.value))
-const lifecycleOption = computed(() => buildLifecycleCanvasOption(lifecycleNodes, selectedNodeId.value, activeProblem.value, healthProblems.filter((problem) => ['P-QA-01', 'P-SEW-01'].includes(problem.id))))
+const lifecycleOption = computed(() => buildLifecycleCanvasOption(lifecycleNodes, selectedNodeId.value, motionEnabled.value))
 const problemFocusOption = computed(() => buildProblemFocusOption(lifecycleNodes, activeProblem.value, selectedRelationNodeId.value, dataState.value === 'normal'))
 const periodOption = computed(() => buildPeriodComparisonOption(periodData.value, periodMetric.value, selectedPeriod.value))
 const evidenceTrendOption = computed(() => buildEvidenceTrendOption(analysisProfile.value, activeProblem.value))
@@ -86,6 +150,29 @@ const candidateEvidenceOption = computed(() => buildCandidateEvidenceOption(anal
 const actionPriorityOption = computed(() => buildActionPriorityOption(analysisProfile.value.actionCandidates))
 const managementOption = computed(() => buildManagementEffectivenessOption(managementInterventionEvidence))
 const validationTimelineOption = computed(() => buildValidationTimelineOption())
+const scopedClosureProblems = computed(() => problemListScope.value === 'factory'
+  ? healthProblems
+  : healthProblems.filter((problem) => problem.nodeId === selectedNodeId.value))
+const closureRows = computed(() => scopedClosureProblems.value.map((problem) => ({
+  problem,
+  draft: interventionDrafts.value[problem.id],
+  status: deriveProblemClosureStatus(problem, interventionDrafts.value[problem.id]),
+})))
+const closureCounts = computed(() => closureRows.value.reduce<Record<ProblemClosureStatus, number>>((counts, row) => {
+  counts[row.status] += 1
+  return counts
+}, { pending: 0, processing: 0, verified: 0, recurred: 0 }))
+const visibleClosureRows = computed(() => problemListFilter.value === 'all'
+  ? closureRows.value
+  : closureRows.value.filter((row) => row.status === problemListFilter.value))
+const editingProblem = computed(() => editingProblemId.value ? problemById.get(editingProblemId.value) ?? null : null)
+const canEditIntervention = computed(() => dataState.value === 'normal' && editorRole.value !== 'viewer')
+const interventionDisabledReason = computed(() => {
+  if (editorRole.value === 'viewer') return '当前角色仅可查看，不能更新演示处理记录。'
+  if (dataState.value === 'stale') return '数据已过期，结论复核前禁止确认解决。'
+  if (dataState.value !== 'normal') return '数据异常或口径不一致，暂停更新闭环状态。'
+  return ''
+})
 const relationTraceNodes = computed(() => activeProblem.value.traceNodeIds
   .map((nodeId) => lifecycleById.get(nodeId))
   .filter((node): node is NonNullable<typeof node> => Boolean(node)))
@@ -98,7 +185,7 @@ const stageSource = computed(() => {
 })
 const selectedRelationDetail = computed(() => {
   if (selectedRelationNodeId.value === activeProblem.value.id) {
-    return { label: activeProblem.value.title, source: activeProblem.value.facts[0]?.source ?? '演示：问题事件记录', detail: activeProblem.value.summary, status: '严重异常事实' }
+    return { label: activeProblem.value.title, source: activeProblem.value.facts[0]?.source ?? '演示：问题事件记录', detail: activeProblem.value.summary, status: closureStatusLabels[activeClosureStatus.value] }
   }
   if (selectedRelationNodeId.value.startsWith('fact-')) {
     const fact = activeProblem.value.facts[Number(selectedRelationNodeId.value.replace('fact-', ''))]
@@ -154,6 +241,50 @@ function pushRoute(problemId?: string, step?: number) {
 function selectNode(nodeId: LifecycleNodeId) {
   selectedNodeId.value = nodeId
   replaceRoute()
+}
+
+function selectProblemFromList(problem: HealthProblem) {
+  if (canOpenRelation.value) openProblem(problem.id)
+}
+
+function openInterventionEditor(problem: HealthProblem) {
+  editingProblemId.value = problem.id
+  const saved = interventionDrafts.value[problem.id] ?? createEmptyInterventionDraft(problem.id)
+  Object.assign(interventionForm, saved, { checkedItemIds: [...saved.checkedItemIds] })
+  interventionFormError.value = ''
+}
+
+function closeInterventionEditor() {
+  editingProblemId.value = null
+  interventionFormError.value = ''
+}
+
+function toggleInspectionItem(itemId: string) {
+  if (!canEditIntervention.value) return
+  const next = new Set(interventionForm.checkedItemIds)
+  if (next.has(itemId)) next.delete(itemId)
+  else next.add(itemId)
+  interventionForm.checkedItemIds = [...next]
+  if (interventionForm.verificationStatus === 'not-started') interventionForm.verificationStatus = 'pending-verification'
+}
+
+function saveInterventionRecord() {
+  if (!editingProblem.value || !canEditIntervention.value) return
+  if (interventionForm.verificationStatus === 'verified' && !isVerifiedDraftComplete(interventionForm)) {
+    interventionFormError.value = '确认已解决前，必须完整填写处理人、实际措施、验证时间和验证证据。'
+    return
+  }
+  const saved: InterventionDraft = {
+    ...interventionForm,
+    problemId: editingProblem.value.id,
+    checkedItemIds: [...interventionForm.checkedItemIds],
+    nonRecurrenceDays: interventionForm.verificationStatus === 'verified' ? interventionForm.nonRecurrenceDays : null,
+    updatedAt: new Date().toLocaleString('zh-CN', { hour12: false }),
+    isDemo: true,
+  }
+  interventionDrafts.value = { ...interventionDrafts.value, [saved.problemId]: saved }
+  persistInterventionDrafts(interventionDrafts.value)
+  closeInterventionEditor()
 }
 
 function selectPeriod(period: PeriodKey) {
@@ -267,7 +398,7 @@ watch(() => [route.query.problem, route.query.step, route.query.period, route.qu
 
     <section class="v4-conclusion-line" aria-label="老板结论">
       <div class="v4-conclusion-heading"><small>EXECUTIVE CONCLUSION</small><strong>{{ canShowConclusion ? `${periodLabels[selectedPeriod]}首要管理结论` : unavailableCopy?.[0] }}</strong></div>
-      <dl><div><dt>首要问题</dt><dd>{{ canShowConclusion ? activeProblem.title : unavailableCopy?.[1] }}</dd></div><div><dt>影响范围</dt><dd>{{ canShowConclusion ? `${activeProblem.impactValue} ${activeProblem.impactUnit} · ${activeProblem.identity.batch}` : '--' }}</dd></div><div><dt>预警等级</dt><dd class="is-danger">{{ canShowConclusion ? latestAlert?.levelLabel : '--' }}</dd></div><div><dt>优先动作</dt><dd>{{ canShowConclusion ? priorityAction : '等待数据恢复' }}</dd></div><div><dt>建议岗位</dt><dd class="is-ai">{{ canShowConclusion ? activeProblem.suggestedRole : '暂不关联岗位' }}</dd></div></dl>
+      <dl><div><dt>首要问题</dt><dd>{{ canShowConclusion ? activeProblem.title : unavailableCopy?.[1] }}</dd></div><div><dt>影响范围</dt><dd>{{ canShowConclusion ? `${activeProblem.impactValue} ${activeProblem.impactUnit} · ${activeProblem.identity.batch}` : '--' }}</dd></div><div><dt>预警等级</dt><dd :class="activeClosureStatus === 'verified' ? 'is-ai' : 'is-danger'">{{ canShowConclusion ? currentAlertLabel : '--' }}</dd></div><div><dt>优先动作</dt><dd>{{ canShowConclusion ? priorityAction : '等待数据恢复' }}</dd></div><div><dt>建议岗位</dt><dd class="is-ai">{{ canShowConclusion ? activeProblem.suggestedRole : '暂不关联岗位' }}</dd></div></dl>
     </section>
 
     <section class="v4-canvas-stage">
@@ -281,8 +412,45 @@ watch(() => [route.query.problem, route.query.step, route.query.period, route.qu
 
       <template v-if="viewMode === 'factory'">
         <div class="v4-lifecycle-chart v4-lifecycle-chart--factory"><EChart :option="lifecycleOption" :state="chartState" @select="handleLifecycleSelect" /></div>
-        <button v-if="canOpenRelation" type="button" class="v4-issue-beacon v4-issue-beacon--quality" aria-label="查看缝皱不良第三次警报" @click="openProblem('P-QA-01')"><span>严重异常 · 第三次警报</span><strong>缝皱不良</strong><small>46 pcs · 自动进入待干预流程态</small></button>
-        <button v-if="canOpenRelation" type="button" class="v4-issue-beacon v4-issue-beacon--sewing" aria-label="查看缝制三组在制持续超时" @click="openProblem('P-SEW-01')"><span>严重异常 · 待干预</span><strong>缝制在制超时</strong><small>214 pcs · 持续 94 分钟</small></button>
+        <div v-if="canOpenRelation" class="v4-issue-rail" aria-label="重点问题标记">
+          <button type="button" class="v4-issue-beacon v4-issue-beacon--sewing" aria-label="查看缝制三组在制持续超时" @click="openProblem('P-SEW-01')">
+            <span class="v4-alert-beacon" aria-hidden="true">!</span><i aria-hidden="true" /><span class="v4-alert-strip"><em>待干预</em><strong>缝制在制超时</strong><small>214 pcs · 持续 94 分钟</small></span>
+          </button>
+          <button type="button" class="v4-issue-beacon v4-issue-beacon--quality" aria-label="查看缝皱不良第三次警报" @click="openProblem('P-QA-01')">
+            <span class="v4-alert-beacon" aria-hidden="true">!</span><i aria-hidden="true" /><span class="v4-alert-strip"><em>第三次警报</em><strong>缝皱不良</strong><small>46 pcs · 已进入待干预流程态</small></span>
+          </button>
+        </div>
+        <aside class="v4-problem-closure" aria-label="问题闭环清单">
+          <header>
+            <div><small>PROBLEM CLOSURE</small><strong>问题闭环清单</strong></div>
+            <span>演示数据</span>
+          </header>
+          <div class="v4-closure-scope">
+            <button type="button" :class="{ 'is-active': problemListScope === 'node' }" @click="problemListScope = 'node'">当前节点 · {{ activeNode.shortLabel }}</button>
+            <button type="button" :class="{ 'is-active': problemListScope === 'factory' }" @click="problemListScope = 'factory'">全厂问题</button>
+          </div>
+          <div class="v4-closure-filters" aria-label="问题状态筛选">
+            <button v-for="filter in closureFilters" :key="filter.id" type="button" :class="{ 'is-active': problemListFilter === filter.id }" @click="problemListFilter = filter.id">
+              <span>{{ filter.label }}</span><strong>{{ filter.id === 'all' ? closureRows.length : closureCounts[filter.id] }}</strong>
+            </button>
+          </div>
+          <div class="v4-closure-role"><span>演示角色</span><select v-model="editorRole"><option v-for="(label, role) in editorRoleLabels" :key="role" :value="role">{{ label }}</option></select></div>
+          <div class="v4-closure-list">
+            <article v-for="row in visibleClosureRows" :key="row.problem.id" class="v4-closure-row" :class="`is-${row.status}`">
+              <button type="button" class="v4-closure-main" :aria-label="`查看${row.problem.title}`" @click="selectProblemFromList(row.problem)">
+                <span class="v4-closure-symbol" aria-hidden="true">{{ closureStatusSymbols[row.status] }}</span>
+                <span class="v4-closure-copy"><strong>{{ row.problem.title }}</strong><small>{{ lifecycleById.get(row.problem.nodeId)?.shortLabel }} · {{ row.problem.impactValue }} {{ row.problem.impactUnit }}</small></span>
+                <em>{{ closureStatusLabels[row.status] }}</em>
+              </button>
+              <div v-if="row.status === 'verified' && row.draft" class="v4-closure-resolved">
+                <strong>已验证解决</strong><span>{{ row.draft.verifiedAt }} · {{ row.draft.handler }}</span><small>{{ row.draft.actualMeasure }}</small>
+              </div>
+              <footer><span>{{ row.status === 'verified' ? `${row.draft?.nonRecurrenceDays ?? 0}天未复发` : row.problem.responseStatus }}</span><button type="button" @click="openInterventionEditor(row.problem)">{{ row.draft ? '查看 / 更新记录' : '记录处理' }}</button></footer>
+            </article>
+            <div v-if="visibleClosureRows.length === 0" class="v4-closure-empty"><strong>当前范围无此状态问题</strong><span>可切换筛选或查看全厂问题。</span></div>
+          </div>
+          <footer><span class="v4-closure-legend is-action">✓ 检查项完成</span><strong class="v4-closure-legend is-verified">✓ 问题已验证解决</strong></footer>
+        </aside>
         <section class="v4-period-rail">
           <header><div><small>MULTI-PERIOD COMPARISON</small><strong>四周期态势对比</strong></div><nav><button v-for="(label, metric) in periodMetricLabels" :key="metric" type="button" :class="{ 'is-active': periodMetric === metric }" @click="setPeriodMetric(metric)">{{ label }}</button></nav></header>
           <div class="v4-period-chart"><EChart :option="periodOption" :state="chartState" @select="handlePeriodSelect" /></div>
@@ -292,9 +460,9 @@ watch(() => [route.query.problem, route.query.step, route.query.period, route.qu
 
       <template v-else-if="problemPhase === 'relation'">
         <div class="v4-lifecycle-chart v4-lifecycle-chart--relation"><EChart :option="problemFocusOption" :state="chartState" @select="handleProblemFocusSelect" /></div>
-        <aside class="v4-focus-summary" aria-live="polite">
+        <aside class="v4-focus-summary" :class="`is-${activeClosureStatus}`" aria-live="polite">
           <header class="v4-focus-summary__header">
-            <span>严重异常事实</span>
+            <span>{{ activeClosureStatus === 'verified' ? '已验证解决 · 演示数据' : activeClosureStatus === 'recurred' ? '再次复发事实' : '待处理问题事实' }}</span>
             <strong>{{ activeProblem.title }}</strong>
             <small>来源：{{ activeProblem.facts[0]?.source ?? '演示：问题事件记录' }}</small>
           </header>
@@ -316,12 +484,19 @@ watch(() => [route.query.problem, route.query.step, route.query.period, route.qu
             <dl><div v-for="fact in activeProblem.facts" :key="fact.label"><dt>{{ fact.label }}</dt><dd>{{ fact.value }}</dd></div></dl>
           </section>
 
+          <section v-if="activeClosureDraft" class="v4-focus-closure" :class="`is-${activeClosureStatus}`" aria-label="闭环验证记录">
+            <header><span>CLOSURE RECORD</span><strong>{{ closureStatusSymbols[activeClosureStatus] }} {{ closureStatusLabels[activeClosureStatus] }} · 演示数据</strong></header>
+            <dl><div><dt>处理人 / 处理时间</dt><dd>{{ activeClosureDraft.handler || '待记录' }} · {{ activeClosureDraft.handledAt || '--' }}</dd></div><div><dt>验证时间 / 未复发</dt><dd>{{ activeClosureDraft.verifiedAt || '待验证' }} · {{ activeClosureDraft.nonRecurrenceDays ?? 0 }}天</dd></div></dl>
+            <p><strong>实际措施：</strong>{{ activeClosureDraft.actualMeasure || '待记录' }}</p>
+            <p><strong>验证证据：</strong>{{ activeClosureDraft.evidenceNote || '待补充' }}</p>
+          </section>
+
           <section class="v4-focus-trace" aria-label="追溯范围">
             <header><span>TRACE SCOPE</span><strong>追溯范围 · 待现场确认</strong></header>
             <div><span v-for="node in relationTraceNodes" :key="node.id">{{ node.shortLabel }}</span></div>
           </section>
 
-          <section class="v4-focus-current" aria-label="当前查看节点">
+          <section v-if="!activeClosureDraft" class="v4-focus-current" aria-label="当前查看节点">
             <div><span>{{ selectedRelationDetail.status }}</span><strong>{{ selectedRelationDetail.label }}</strong></div>
             <small>{{ selectedRelationDetail.source }}</small>
             <p>{{ selectedRelationDetail.detail }}</p>
@@ -372,6 +547,30 @@ watch(() => [route.query.problem, route.query.step, route.query.period, route.qu
     </section>
 
     <footer class="v4-cabin-footer"><div><i /><span>冷青：数据事实</span><i class="is-ai" /><span>翡翠绿：AI建议</span><i class="is-pending" /><span>琥珀：待确认</span><i class="is-danger" /><span>红色：严重异常</span></div><strong>抽象演示画布 · 不代表松冈真实生产或人员评价结论</strong></footer>
+
+    <div v-if="editingProblem" class="v4-intervention-overlay" role="presentation" @click.self="closeInterventionEditor">
+      <section class="v4-intervention-dialog" role="dialog" aria-modal="true" :aria-label="`${editingProblem.title}处理记录`">
+        <header><div><small>DEMO INTERVENTION RECORD</small><h2>{{ editingProblem.title }}</h2><span>{{ lifecycleById.get(editingProblem.nodeId)?.label }} · {{ editingProblem.identity.batch }} · 演示数据</span></div><button type="button" aria-label="关闭处理记录" @click="closeInterventionEditor">×</button></header>
+        <div class="v4-intervention-body">
+          <section class="v4-intervention-checks">
+            <header><strong>标准检查清单</strong><span>小对钩仅代表检查动作完成</span></header>
+            <button v-for="item in editingProblem.inspectionItems" :key="item.id" type="button" :class="{ 'is-checked': interventionForm.checkedItemIds.includes(item.id) }" :disabled="!canEditIntervention" @click="toggleInspectionItem(item.id)">
+              <i>{{ interventionForm.checkedItemIds.includes(item.id) ? '✓' : '' }}</i><span><strong>{{ item.category }} · {{ item.label }}</strong><small>{{ item.method }} · 所需证据：{{ item.requiredEvidence }}</small></span>
+            </button>
+          </section>
+          <section class="v4-intervention-form">
+            <label><span>处理人</span><input v-model="interventionForm.handler" :disabled="!canEditIntervention" placeholder="录入实际处理人" /></label>
+            <label><span>处理时间</span><input v-model="interventionForm.handledAt" :disabled="!canEditIntervention" placeholder="YYYY-MM-DD HH:mm" /></label>
+            <label class="is-wide"><span>实际措施</span><textarea v-model="interventionForm.actualMeasure" :disabled="!canEditIntervention" rows="2" placeholder="记录已实际执行的措施" /></label>
+            <label class="is-wide"><span>验证证据</span><textarea v-model="interventionForm.evidenceNote" :disabled="!canEditIntervention" rows="2" placeholder="记录检验、节拍或连续观察证据" /></label>
+            <label><span>验证时间</span><input v-model="interventionForm.verifiedAt" :disabled="!canEditIntervention" placeholder="YYYY-MM-DD HH:mm" /></label>
+            <label><span>闭环状态</span><select v-model="interventionForm.verificationStatus" :disabled="!canEditIntervention"><option value="not-started">待处理</option><option value="pending-verification">处理中 / 待验证</option><option value="verifying">验证中</option><option value="verified">验证通过 / 已解决</option><option value="recurred">再次复发</option></select></label>
+            <label v-if="interventionForm.verificationStatus === 'verified'"><span>无复发天数</span><input v-model.number="interventionForm.nonRecurrenceDays" type="number" min="0" :disabled="!canEditIntervention" /></label>
+          </section>
+        </div>
+        <footer><div><strong>绿色大对钩规则</strong><span>处理人、实际措施、验证时间和验证证据完整，且状态为“验证通过”时才显示。</span><em v-if="interventionDisabledReason">{{ interventionDisabledReason }}</em><em v-if="interventionFormError" class="is-error">{{ interventionFormError }}</em></div><button type="button" :disabled="!canEditIntervention" @click="saveInterventionRecord">保存演示记录</button></footer>
+      </section>
+    </div>
   </main>
 </template>
 

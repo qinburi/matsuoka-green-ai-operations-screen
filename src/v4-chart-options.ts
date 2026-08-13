@@ -67,18 +67,18 @@ function baseGraphic(title: string, subtitle: string): EChartsOption['graphic'] 
 export function buildLifecycleCanvasOption(
   nodes: LifecycleNode[],
   selectedNodeId: LifecycleNodeId,
-  problem: HealthProblem,
-  problems: HealthProblem[] = [problem],
+  motionEnabled = true,
 ): EChartsOption {
+  const nodeStep = 128
   const graphNodes = nodes.map((node, index) => ({
     id: node.id,
     nodeId: node.id,
     nodeType: 'lifecycle',
     name: node.shortLabel,
-    x: index * 118,
-    y: 200,
+    x: index * nodeStep,
+    y: 224,
     symbol: 'roundRect',
-    symbolSize: [112, 92],
+    symbolSize: [86, 74],
     itemStyle: {
       color: node.id === selectedNodeId ? '#e9f9fd' : '#f8fcff',
       borderColor: healthColors[node.health],
@@ -90,40 +90,22 @@ export function buildLifecycleCanvasOption(
     label: {
       show: true,
       color: palette.ink,
-      lineHeight: 20,
+      lineHeight: 16,
       formatter: `{order|${String(node.order).padStart(2, '0')}}  {name|${node.shortLabel}}\n{metric|${metricText(node)}}\n{issues|${node.issueCount} 次问题}  {state|${node.health === 'critical' ? '严重' : node.health === 'warning' ? '预警' : node.health === 'notice' ? '关注' : '正常'}}`,
       rich: {
         order: { color: palette.cyan, fontSize: 10, fontWeight: 700 },
-        name: { color: palette.ink, fontSize: 15, fontWeight: 700 },
-        metric: { color: '#365b7d', fontSize: 10 },
-        issues: { color: palette.muted, fontSize: 10 },
-        state: { color: healthColors[node.health], fontSize: 10, fontWeight: 700 },
+        name: { color: palette.ink, fontSize: 13, fontWeight: 700 },
+        metric: { color: '#365b7d', fontSize: 9 },
+        issues: { color: palette.muted, fontSize: 9 },
+        state: { color: healthColors[node.health], fontSize: 9, fontWeight: 700 },
       },
     },
   }))
-
-  const issueNodes = problems.map((item, index) => ({
-    id: item.id,
-    problemId: item.id,
-    nodeId: item.nodeId,
-    nodeType: 'issue',
-    name: item.title,
-    x: item.nodeId === 'sewing' ? 4 * 118 : 7 * 118,
-    y: item.nodeId === 'sewing' ? 70 : 42 + index * 2,
-    symbol: 'circle',
-    symbolSize: item.nodeId === 'sewing' ? 34 : 38,
-    itemStyle: {
-      color: item.severity === 'critical' ? palette.danger : palette.amber,
-      borderColor: palette.white,
-      borderWidth: 4,
-      shadowBlur: 24,
-      shadowColor: item.severity === 'critical' ? 'rgba(229,66,77,.56)' : 'rgba(228,155,32,.42)',
-    },
-    label: { show: true, formatter: '!', color: palette.white, fontSize: 18, fontWeight: 800 },
-  }))
   const paddingNodes = [
-    { id: 'padding-left', name: '', x: -82, y: 300, symbolSize: 1, itemStyle: { opacity: 0 }, label: { show: false }, tooltip: { show: false } },
-    { id: 'padding-right', name: '', x: 1144, y: 300, symbolSize: 1, itemStyle: { opacity: 0 }, label: { show: false }, tooltip: { show: false } },
+    { id: 'padding-left', name: '', x: -50, y: 300, symbolSize: 1, itemStyle: { opacity: 0 }, label: { show: false }, tooltip: { show: false } },
+    { id: 'padding-right', name: '', x: (nodes.length - 1) * nodeStep + 50, y: 300, symbolSize: 1, itemStyle: { opacity: 0 }, label: { show: false }, tooltip: { show: false } },
+    { id: 'padding-top', name: '', x: ((nodes.length - 1) * nodeStep) / 2, y: 0, symbolSize: 1, itemStyle: { opacity: 0 }, label: { show: false }, tooltip: { show: false } },
+    { id: 'padding-bottom', name: '', x: ((nodes.length - 1) * nodeStep) / 2, y: 360, symbolSize: 1, itemStyle: { opacity: 0 }, label: { show: false }, tooltip: { show: false } },
   ]
 
   return {
@@ -135,10 +117,6 @@ export function buildLifecycleCanvasOption(
       borderColor: 'rgba(116,216,238,.58)',
       textStyle: { color: '#fff', fontSize: 12 },
       formatter: (params: any) => {
-        if (params.data?.nodeType === 'issue') {
-          const item = problems.find((candidate) => candidate.id === params.data.problemId) ?? problem
-          return `<b>${item.title}</b><br/>${item.impactValue} ${item.impactUnit} · ${item.alertEvents[item.alertEvents.length - 1]?.levelLabel ?? '问题提示'}<br/>点击查看已记录证据`
-        }
         const node = nodes.find((item) => item.id === params.data?.nodeId)
         return node ? `<b>${node.label}</b><br/>${node.coreMetric.definition}<br/>来源：${node.dataSource}` : ''
       },
@@ -164,6 +142,35 @@ export function buildLifecycleCanvasOption(
               shape: { x1: api.getWidth() * 0.055, y1: api.getHeight() * 0.64, x2: api.getWidth() * 0.945, y2: api.getHeight() * 0.64 },
               style: { stroke: 'rgba(22,168,213,.36)', lineWidth: 1.5, lineDash: [7, 8] },
             },
+            {
+              type: 'polyline',
+              shape: {
+                points: Array.from({ length: 121 }, (_, index) => {
+                  const progress = index / 120
+                  const startX = api.getWidth() * 0.055
+                  const endX = api.getWidth() * 0.945
+                  const centerY = api.getHeight() * 0.64
+                  return [startX + (endX - startX) * progress, centerY + Math.sin(progress * Math.PI * 36) * 2.2]
+                }),
+              },
+              style: {
+                stroke: 'rgba(83,207,232,.78)',
+                lineWidth: 2.4,
+                lineDash: [12, 18],
+                lineDashOffset: 0,
+                shadowBlur: 7,
+                shadowColor: 'rgba(22,168,213,.38)',
+                fill: null,
+              },
+              keyframeAnimation: motionEnabled ? {
+                duration: 3600,
+                loop: true,
+                keyframes: [
+                  { percent: 0, style: { lineDashOffset: 0 } },
+                  { percent: 1, style: { lineDashOffset: -120 } },
+                ],
+              } : undefined,
+            },
           ],
         }),
       },
@@ -177,18 +184,11 @@ export function buildLifecycleCanvasOption(
         bottom: '15%',
         roam: false,
         edgeSymbol: ['none', 'arrow'],
-        edgeSymbolSize: [0, 8],
+        edgeSymbolSize: [0, 14],
         emphasis: { focus: 'adjacency', scale: 1.04 },
-        data: [...graphNodes, ...issueNodes, ...paddingNodes],
-        links: [
-          ...lifecycleEdges(nodes),
-          ...problems.map((item) => ({
-            source: item.id,
-            target: item.nodeId,
-            lineStyle: { color: item.severity === 'critical' ? palette.danger : palette.amber, width: 2, type: 'dashed' as const, opacity: 0.76, curveness: 0.08 },
-          })),
-        ],
-        lineStyle: { color: palette.cyan, width: 2, opacity: 0.6 },
+        data: [...graphNodes, ...paddingNodes],
+        links: lifecycleEdges(nodes),
+        lineStyle: { color: palette.cyan, width: 2.4, opacity: 0.72 },
       },
     ],
   }
@@ -303,29 +303,82 @@ export function buildProblemFocusOption(
     { id: 'focus-padding-right', name: '', x: 1110, y: 520, symbolSize: 1, itemStyle: { opacity: 0 }, label: { show: false }, tooltip: { show: false } },
   ]
 
+  const hiddenAnchor = (id: string, x: number, y: number) => ({
+    id,
+    name: '',
+    x,
+    y,
+    symbolSize: 1,
+    silent: true,
+    itemStyle: { opacity: 0 },
+    label: { show: false },
+    tooltip: { show: false },
+  })
+  const traceSourceIds = problem.traceNodeIds.filter((nodeId) => nodeId !== problem.nodeId)
+  const traceAnchors = traceSourceIds.map((_, index) => hiddenAnchor(
+    `trace-anchor-${index}`,
+    issueNode.x + (index - (traceSourceIds.length - 1) / 2) * 92,
+    issueNode.y - 36,
+  ))
+  const alertAnchor = hiddenAnchor('alert-anchor', issueNode.x, issueNode.y - 36)
+  const factStartAnchors = factNodes.map((_, index) => hiddenAnchor(
+    `fact-start-anchor-${index}`,
+    issueNode.x + (index - (factNodes.length - 1) / 2) * 58,
+    issueNode.y + 63,
+  ))
+  const factEndAnchors = factNodes.map((factNode, index) => hiddenAnchor(
+    `fact-end-anchor-${index}`,
+    factNode.x,
+    factNode.y - 50,
+  ))
+
   const lifecycleLinks = compactNodes.slice(0, -1).map((node, index) => ({
     source: node.id,
     target: compactNodes[index + 1].id,
+    sourceOwnerId: node.id,
+    targetOwnerId: compactNodes[index + 1].id,
     relationType: 'lifecycle-context',
     lineStyle: { color: 'rgba(22,168,213,.28)', width: 1.5, opacity: 0.48 },
   }))
-  const traceLinks = problem.traceNodeIds.slice(0, -1).map((nodeId, index) => ({
-    source: `context-${nodeId}`,
-    target: `context-${problem.traceNodeIds[index + 1]}`,
-    relationType: 'trace-pending',
-    lineStyle: { color: palette.amber, width: 2.2, type: 'dashed' as const, opacity: 0.78, curveness: 0.08 },
-  }))
-  const factLinks = factNodes.map((factNode) => ({
-    source: problem.id,
-    target: factNode.id,
+  const traceLinks = traceSourceIds
+    .map((nodeId, index) => {
+      const sourceNode = compactNodes.find((node) => node.nodeId === nodeId)
+      const horizontalOffset = (sourceNode?.x ?? issueNode.x) - issueNode.x
+      return {
+        source: `context-${nodeId}`,
+        target: traceAnchors[index].id,
+        sourceOwnerId: `context-${nodeId}`,
+        targetOwnerId: problem.id,
+        relationType: 'trace-pending',
+        lineStyle: {
+          color: palette.amber,
+          width: 2.2,
+          type: 'dashed' as const,
+          opacity: 0.78,
+          curveness: horizontalOffset === 0 ? 0 : horizontalOffset < 0 ? -0.12 : 0.12,
+        },
+      }
+    })
+  const factLinks = factNodes.map((factNode, index) => ({
+    source: factStartAnchors[index].id,
+    target: factEndAnchors[index].id,
+    sourceOwnerId: problem.id,
+    targetOwnerId: factNode.id,
     relationType: 'fact',
-    lineStyle: { color: palette.cyan, width: 2.5, opacity: 0.72, curveness: 0.04 },
+    lineStyle: {
+      color: palette.cyan,
+      width: 2.5,
+      opacity: 0.72,
+      curveness: factNodes.length === 1 ? 0 : index < (factNodes.length - 1) / 2 ? 0.08 : -0.08,
+    },
   }))
   const alertLink = {
     source: `context-${problem.nodeId}`,
-    target: problem.id,
+    target: alertAnchor.id,
+    sourceOwnerId: `context-${problem.nodeId}`,
+    targetOwnerId: problem.id,
     relationType: 'alert-fact',
-    lineStyle: { color: palette.danger, width: 2, type: 'dashed' as const, opacity: 0.68 },
+    lineStyle: { color: palette.danger, width: 2.4, type: 'solid' as const, opacity: 0.82, curveness: 0 },
   }
   const links = [
     ...lifecycleLinks,
@@ -336,7 +389,7 @@ export function buildProblemFocusOption(
     ...link,
     lineStyle: {
       ...link.lineStyle,
-      opacity: !selectedRelationNodeId || selectedRelationNodeId === problem.id || link.source === selectedRelationNodeId || link.target === selectedRelationNodeId
+      opacity: !selectedRelationNodeId || selectedRelationNodeId === problem.id || link.sourceOwnerId === selectedRelationNodeId || link.targetOwnerId === selectedRelationNodeId || link.source === selectedRelationNodeId || link.target === selectedRelationNodeId
         ? link.lineStyle.opacity ?? 0.78
         : 0.15,
     },
@@ -370,7 +423,7 @@ export function buildProblemFocusOption(
       roam: false,
       edgeSymbol: ['none', 'arrow'],
       edgeSymbolSize: [0, 7],
-      data: [...compactNodes, issueNode, ...factNodes, ...focusPaddingNodes],
+      data: [...compactNodes, issueNode, ...factNodes, ...traceAnchors, alertAnchor, ...factStartAnchors, ...factEndAnchors, ...focusPaddingNodes],
       links,
       lineStyle: { color: palette.cyan, width: 2, opacity: 0.56 },
       emphasis: { focus: 'adjacency', scale: 1.03 },

@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs'
 import { hotspotContexts, rawTopics } from '../src/data/demo-raw.mjs'
 import { demoScenarioRaw, factoryZonesRaw, issueRelationsRaw } from '../src/data/factory-scene-raw.mjs'
 import { alertRuleConfigRaw, calculateStabilityAssessmentRaw, evaluateAlertSequenceRaw } from '../src/data/v4-rules-raw.mjs'
+import { deriveProblemClosureStatusRaw, sanitizeInterventionDraftsRaw } from '../src/data/v4-problem-closure-raw.mjs'
 
 const readProjectFile = (path) => readFileSync(new URL(`../${path}`, import.meta.url), 'utf-8')
 
@@ -234,6 +235,18 @@ test('V4缝皱警报先进入事实关联总览再手动进入三步分析', () 
   assert.match(versionSource, /恢复缝皱问题事实关联总览/)
 })
 
+test('V4问题关联线汇聚到问题节点并避让事实节点', () => {
+  const chartSource = readProjectFile('src/v4-chart-options.ts')
+
+  assert.match(chartSource, /\.filter\(\(nodeId\) => nodeId !== problem\.nodeId\)/)
+  assert.match(chartSource, /const hiddenAnchor =/)
+  assert.match(chartSource, /target: traceAnchors\[index\]\.id/)
+  assert.match(chartSource, /target: alertAnchor\.id/)
+  assert.match(chartSource, /source: factStartAnchors\[index\]\.id,\s+target: factEndAnchors\[index\]\.id/)
+  assert.match(chartSource, /sourceOwnerId: problem\.id/)
+  assert.match(chartSource, /factNodes\.length === 1 \? 0/)
+})
+
 test('V4问题关联页使用固定事实说明区和醒目主操作', () => {
   const viewSource = readProjectFile('src/views/V4HealthInterventionView.vue')
   const styleSource = readProjectFile('src/v4-health-center.css')
@@ -263,14 +276,50 @@ test('V4同时提供品质与缝制问题入口并按问题切换分析内容', 
   assert.match(viewSource, /openProblem\('P-SEW-01'\)/)
   assert.match(viewSource, /requestedProblem.*problemById\.has/)
   assert.match(viewSource, /selectedRelationNodeId\.value = problemValue/)
-  assert.match(viewSource, /priorityAction = computed\(\(\) => activeProblem\.value\.plan\[0\]/)
+  assert.match(viewSource, /priorityAction = computed\(\(\) => activeClosureStatus\.value === 'verified'/)
+  assert.match(viewSource, /activeProblem\.value\.plan\[0\] \?\? '先核对问题事实与数据口径'/)
   assert.match(viewSource, /activeProblem\.facts\.length/)
   assert.match(dataSource, /id: 'P-SEW-01'.*title: '缝制三组在制持续超时'/s)
   assert.match(analysisSource, /'P-SEW-01': \{/)
   assert.match(analysisSource, /超时在制趋势与待干预事件/)
   assert.match(analysisSource, /MES在制记录 \/ 工序进出站时间/)
-  assert.match(chartSource, /problems: HealthProblem\[\] = \[problem\]/)
-  assert.match(chartSource, /problems\.map\(\(item\)/)
+  assert.doesNotMatch(chartSource, /const issueNodes/)
+  assert.match(viewSource, /v4-alert-beacon/)
+})
+
+test('V4生命周期节点与问题标记使用十列均分布局', () => {
+  const viewSource = readProjectFile('src/views/V4HealthInterventionView.vue')
+  const chartSource = readProjectFile('src/v4-chart-options.ts')
+  const styleSource = readProjectFile('src/v4-health-center.css')
+
+  assert.match(chartSource, /const nodeStep = 128/)
+  assert.match(chartSource, /symbolSize: \[86, 74\]/)
+  assert.match(chartSource, /x: index \* nodeStep/)
+  assert.match(chartSource, /id: 'padding-top'/)
+  assert.match(chartSource, /id: 'padding-bottom'/)
+  assert.match(viewSource, /class="v4-issue-rail"/)
+  assert.match(styleSource, /grid-template-columns: repeat\(10, minmax\(0, 1fr\)\)/)
+  assert.match(styleSource, /v4-issue-beacon--sewing[\s\S]*grid-column: 5/)
+  assert.match(styleSource, /v4-issue-beacon--quality[\s\S]*grid-column: 8/)
+  assert.doesNotMatch(styleSource, /v4-issue-beacon \{ right: 334px/)
+  assert.match(styleSource, /animation: v4-critical-breathe 2\.8s ease-in-out infinite/)
+  assert.match(styleSource, /prefers-reduced-motion: reduce[\s\S]*v4-alert-beacon/)
+})
+
+test('V4生命周期告警连接到节点并提供克制的数据流动效', () => {
+  const viewSource = readProjectFile('src/views/V4HealthInterventionView.vue')
+  const chartSource = readProjectFile('src/v4-chart-options.ts')
+  const styleSource = readProjectFile('src/v4-health-center.css')
+
+  assert.match(viewSource, /buildLifecycleCanvasOption\(lifecycleNodes, selectedNodeId\.value, motionEnabled\.value\)/)
+  assert.match(viewSource, /matchMedia\('\(prefers-reduced-motion: reduce\)'\)/)
+  assert.match(chartSource, /edgeSymbolSize: \[0, 14\]/)
+  assert.match(chartSource, /type: 'polyline'/)
+  assert.match(chartSource, /lineDashOffset: -120/)
+  assert.match(chartSource, /keyframeAnimation: motionEnabled/)
+  assert.match(styleSource, /\.v4-issue-beacon > i\s*\{[^}]*top: 128px;[^}]*bottom: 0;/s)
+  assert.match(styleSource, /width: min\(var\(--v4-alert-width, 194px\), calc\(190% - 10px\)\)/)
+  assert.match(styleSource, /@media \(max-height: 820px\)[\s\S]*grid-template-rows: 44px 6px 60px minmax\(20px, 1fr\)/)
 })
 
 test('V4异常数据状态暂停问题结论且保留生命周期状态', () => {
@@ -286,14 +335,56 @@ test('V4异常数据状态暂停问题结论且保留生命周期状态', () => 
   assert.match(chartSource, /指标口径存在冲突/)
 })
 
-test('V4移除干预记录、复发分析、措施库与履职评价界面', () => {
+test('V4仅提供本地演示处理记录且不扩展为正式任务流', () => {
   const viewSource = readProjectFile('src/views/V4HealthInterventionView.vue')
   const versionSource = readProjectFile('src/version.ts')
 
-  assert.doesNotMatch(viewSource, /保存演示干预记录|新增干预记录|措施有效性库|履职事实|个人总分|排名按钮|正式派单按钮|发送消息按钮/)
-  assert.doesNotMatch(viewSource, /InterventionRecord|interventionRecords|solutionEffectiveness|dutyFacts/)
-  assert.match(versionSource, /未实现正式任务分派、消息推送、干预录入或关闭流程/)
+  assert.match(viewSource, /问题闭环清单/)
+  assert.match(viewSource, /保存演示记录/)
+  assert.match(viewSource, /厂长（演示）/)
+  assert.match(viewSource, /查看者（只读）/)
+  assert.doesNotMatch(viewSource, /措施有效性库|履职事实|个人总分|排名按钮|正式派单按钮|发送消息按钮|写入人事档案/)
+  assert.doesNotMatch(viewSource, /interventionRecords|solutionEffectiveness|dutyFacts/)
+  assert.match(versionSource, /处理记录仅保存于当前浏览器作为演示/)
+  assert.match(versionSource, /不实现正式任务分派、消息推送、MES\/QMS回写或关闭流程/)
   assert.match(versionSource, /V4仅提供桌面端与大屏布局，不制作手机端/)
+})
+
+test('V4问题清单仅在验证证据完整时显示已解决绿色对钩', () => {
+  const viewSource = readProjectFile('src/views/V4HealthInterventionView.vue')
+  const styleSource = readProjectFile('src/v4-health-center.css')
+  const dataSource = readProjectFile('src/data/v4-problem-closure.ts')
+  const ruleSource = readProjectFile('src/data/v4-problem-closure-raw.mjs')
+  const versionSource = readProjectFile('src/version.ts')
+
+  const problem = { alertLevel: 'third', responseStatus: '待响应', identity: { recurrenceState: 'continuous' } }
+  const checkedOnly = { problemId: 'P-X', checkedItemIds: ['X-1'], handler: '', actualMeasure: '', evidenceNote: '', verifiedAt: '', verificationStatus: 'verified', isDemo: true }
+  const complete = { ...checkedOnly, handler: '组长', actualMeasure: '已处理', evidenceNote: '连续两窗口未复发', verifiedAt: '2026-08-13 10:00' }
+  assert.equal(deriveProblemClosureStatusRaw(problem, checkedOnly), 'processing')
+  assert.equal(deriveProblemClosureStatusRaw(problem, complete), 'verified')
+  assert.equal(deriveProblemClosureStatusRaw({ ...problem, alertLevel: 'recurring' }, complete), 'recurred')
+
+  assert.match(viewSource, /小对钩仅代表检查动作完成/)
+  assert.match(viewSource, /绿色大对钩规则/)
+  assert.match(viewSource, /problemListScope === 'factory'/)
+  assert.match(viewSource, /problemListFilter === filter.id/)
+  assert.match(styleSource, /\.v4-closure-symbol\s*\{[^}]*width: 32px;[^}]*height: 32px/s)
+  assert.match(styleSource, /\.v4-closure-row\.is-verified/)
+  assert.match(styleSource, /@keyframes v4-resolved-check/)
+  assert.match(dataSource, /P-QA-02/)
+  assert.match(dataSource, /verificationStatus: 'verified'/)
+  assert.match(ruleSource, /v4-intervention-drafts/)
+  assert.match(versionSource, /新增问题闭环清单与验证通过标识/)
+})
+
+test('V4本地演示记录损坏时回退且过滤非法数据', () => {
+  const defaults = { 'P-DEFAULT': { problemId: 'P-DEFAULT', checkedItemIds: [], handler: '', actualMeasure: '', evidenceNote: '', verifiedAt: '', verificationStatus: 'not-started', nonRecurrenceDays: null, updatedAt: '', isDemo: true } }
+  assert.deepEqual(sanitizeInterventionDraftsRaw(null, defaults), defaults)
+  assert.deepEqual(sanitizeInterventionDraftsRaw([], defaults), defaults)
+  assert.deepEqual(sanitizeInterventionDraftsRaw({ 'P-X': { problemId: 'P-X', checkedItemIds: 'bad', verificationStatus: 'verified', isDemo: true } }, defaults), defaults)
+  const valid = sanitizeInterventionDraftsRaw({ 'P-X': { problemId: 'P-X', checkedItemIds: ['X-1', 9], handler: '组长', actualMeasure: '措施', evidenceNote: '证据', verifiedAt: '时间', verificationStatus: 'verified', nonRecurrenceDays: 8, updatedAt: '现在', isDemo: true } }, defaults)
+  assert.deepEqual(valid['P-X'].checkedItemIds, ['X-1'])
+  assert.equal(valid['P-X'].nonRecurrenceDays, 8)
 })
 
 test('V4四周期使用稳定路由键和截至当前可比口径', () => {

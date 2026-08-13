@@ -309,6 +309,11 @@ export type PeriodMetric = 'count' | 'impact' | 'duration'
 export type ProblemDisplayPhase = 'relation' | 'analysis'
 export type AnalysisStep = 'evidence' | 'cause-solution' | 'responsibility-validation'
 export type StabilityLevel = 'unavailable' | 'observing' | 'pass' | 'good' | 'excellent' | 'recurred'
+export type ProblemClosureStatus = 'pending' | 'processing' | 'verified' | 'recurred'
+export type ProblemClosureFilter = 'all' | ProblemClosureStatus
+export type ProblemListScope = 'node' | 'factory'
+export type InterventionEditorRole = 'factory-manager' | 'department-owner' | 'viewer'
+export type InterventionVerificationStatus = 'not-started' | 'pending-verification' | 'verifying' | 'verified' | 'recurred'
 
 export interface LifecycleMetric {
   label: string
@@ -377,6 +382,20 @@ export interface InterventionRecord {
   verifyAt: string
   recurrenceResult: '待验证' | '未复发' | '再次复发'
   isDemo: boolean
+}
+
+export interface InterventionDraft {
+  problemId: string
+  checkedItemIds: string[]
+  handler: string
+  handledAt: string
+  actualMeasure: string
+  evidenceNote: string
+  verifiedAt: string
+  verificationStatus: InterventionVerificationStatus
+  nonRecurrenceDays: number | null
+  updatedAt: string
+  isDemo: true
 }
 
 export interface SolutionEffectiveness {
