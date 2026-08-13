@@ -77,6 +77,9 @@ const candidateEvidenceOption = computed(() => buildCandidateEvidenceOption(cand
 const actionPriorityOption = computed(() => buildActionPriorityOption(actionCandidates))
 const managementOption = computed(() => buildManagementEffectivenessOption(managementInterventionEvidence))
 const validationTimelineOption = computed(() => buildValidationTimelineOption())
+const relationTraceNodes = computed(() => activeProblem.value.traceNodeIds
+  .map((nodeId) => lifecycleById.get(nodeId))
+  .filter((node): node is NonNullable<typeof node> => Boolean(node)))
 const stageSource = computed(() => {
   if (viewMode.value === 'factory') return activeNode.value.dataSource
   if (problemPhase.value === 'relation') return '演示：QC2-1检验记录 / 质量预警事件 / 批次追溯关系'
@@ -99,6 +102,9 @@ const selectedRelationDetail = computed(() => {
   }
   return { label: activeProblem.value.title, source: '演示：质量预警事件', detail: activeProblem.value.summary, status: '严重异常事实' }
 })
+const relationDisabledCopy = computed(() => dataState.value === 'stale'
+  ? '数据已过期，结论复核后可进入分析'
+  : '数据恢复且口径一致后可进入分析')
 const unavailableCopy = computed(() => {
   if (dataState.value === 'loading') return ['数据更新中', '暂不形成问题判断']
   if (dataState.value === 'empty') return ['当前范围无可用数据', '请调整筛选范围']
@@ -276,13 +282,47 @@ watch(() => [route.query.problem, route.query.step, route.query.period, route.qu
       <template v-else-if="problemPhase === 'relation'">
         <div class="v4-lifecycle-chart v4-lifecycle-chart--relation"><EChart :option="problemFocusOption" :state="chartState" @select="handleProblemFocusSelect" /></div>
         <aside class="v4-focus-summary" aria-live="polite">
-          <span>{{ selectedRelationDetail.status }}</span>
-          <strong>{{ selectedRelationDetail.label }}</strong>
-          <small>{{ selectedRelationDetail.source }}</small>
-          <p>{{ selectedRelationDetail.detail }}</p>
-          <em>当前仅展示已记录事实与待确认追溯范围，不认定根因。</em>
-          <button type="button" :disabled="!canShowRecommendations" @click="enterAnalysis">进入三步分析</button>
-          <small v-if="!canShowRecommendations" class="v4-relation-disabled">{{ dataState === 'stale' ? '数据已过期，结论复核前不可进入建议分析' : '数据恢复后可进入建议分析' }}</small>
+          <header class="v4-focus-summary__header">
+            <span>严重异常事实</span>
+            <strong>{{ activeProblem.title }}</strong>
+            <small>来源：演示质量预警事件</small>
+          </header>
+
+          <p class="v4-focus-summary__lead">{{ activeProblem.summary }}</p>
+
+          <section class="v4-focus-identity" aria-label="问题身份证">
+            <header><span>PROBLEM IDENTITY</span><strong>问题身份证</strong></header>
+            <dl>
+              <div><dt>款号</dt><dd>{{ activeProblem.identity.styleNo }}</dd></div>
+              <div><dt>批次</dt><dd>{{ activeProblem.identity.batch }}</dd></div>
+              <div><dt>工位</dt><dd>{{ activeProblem.identity.station }}</dd></div>
+              <div><dt>时间窗口</dt><dd>{{ activeProblem.identity.timeWindow }}</dd></div>
+            </dl>
+          </section>
+
+          <section class="v4-focus-facts" aria-label="已记录事实">
+            <header><span>RECORDED FACTS</span><strong>三项已记录事实</strong></header>
+            <dl><div v-for="fact in activeProblem.facts" :key="fact.label"><dt>{{ fact.label }}</dt><dd>{{ fact.value }}</dd></div></dl>
+          </section>
+
+          <section class="v4-focus-trace" aria-label="追溯范围">
+            <header><span>TRACE SCOPE</span><strong>追溯范围 · 待现场确认</strong></header>
+            <div><span v-for="node in relationTraceNodes" :key="node.id">{{ node.shortLabel }}</span></div>
+          </section>
+
+          <section class="v4-focus-current" aria-label="当前查看节点">
+            <div><span>{{ selectedRelationDetail.status }}</span><strong>{{ selectedRelationDetail.label }}</strong></div>
+            <small>{{ selectedRelationDetail.source }}</small>
+            <p>{{ selectedRelationDetail.detail }}</p>
+          </section>
+
+          <em class="v4-focus-boundary">当前仅展示已记录事实与待确认追溯范围，不认定根因。</em>
+
+          <footer class="v4-focus-action">
+            <span>查看原因、方案、责任与验证</span>
+            <button type="button" :disabled="!canShowRecommendations" @click="enterAnalysis">进入三步分析</button>
+            <small v-if="!canShowRecommendations" class="v4-relation-disabled">{{ relationDisabledCopy }}</small>
+          </footer>
         </aside>
       </template>
 
