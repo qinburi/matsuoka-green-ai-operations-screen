@@ -79,6 +79,13 @@ export const versionHistory: readonly VersionRelease[] = [
         title: '恢复缝皱问题事实关联总览',
         description: '点击缝皱第三次警报后先展示生命周期位置、追溯范围和已记录事实，再由用户手动进入三步分析链。',
       },
+      {
+        id: 'v4-relation-fact-panel',
+        changedAt: '2026-08-13',
+        category: '问题下钻',
+        title: '放大问题关联事实说明区',
+        description: '将关联总览调整为66%关系图与34%事实说明区，常驻问题身份证、三项事实、追溯范围和醒目的三步分析入口。',
+      },
     ],
   },
   {

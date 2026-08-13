@@ -234,6 +234,25 @@ test('V4缝皱警报先进入事实关联总览再手动进入三步分析', () 
   assert.match(versionSource, /恢复缝皱问题事实关联总览/)
 })
 
+test('V4问题关联页使用固定事实说明区和醒目主操作', () => {
+  const viewSource = readProjectFile('src/views/V4HealthInterventionView.vue')
+  const styleSource = readProjectFile('src/v4-health-center.css')
+  const versionSource = readProjectFile('src/version.ts')
+
+  assert.match(viewSource, /v4-focus-identity/)
+  assert.match(viewSource, /v4-focus-facts/)
+  assert.match(viewSource, /v4-focus-trace/)
+  assert.match(viewSource, /v4-focus-current/)
+  assert.match(viewSource, /查看原因、方案、责任与验证/)
+  assert.match(viewSource, /数据已过期，结论复核后可进入分析/)
+  assert.match(styleSource, /\.v4-lifecycle-chart--relation\s*\{[^}]*right: 34%/s)
+  assert.match(styleSource, /\.v4-focus-summary\s*\{[^}]*width: calc\(34% - 34px\)/s)
+  assert.match(styleSource, /\.v4-focus-action button\s*\{[^}]*height: 54px/s)
+  assert.match(styleSource, /\.v4-focus-action button:focus-visible/)
+  assert.match(styleSource, /\.v4-focus-action button:hover:not\(:disabled\)/)
+  assert.match(versionSource, /放大问题关联事实说明区/)
+})
+
 test('V4异常数据状态暂停问题结论且保留生命周期状态', () => {
   const viewSource = readProjectFile('src/views/V4HealthInterventionView.vue')
   const typeSource = readProjectFile('src/types.ts')
