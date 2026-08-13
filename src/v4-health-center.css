@@ -881,6 +881,16 @@
   transform: translateY(-3px);
 }
 
+.v4-issue-beacon--sewing {
+  top: 31%;
+  right: 39%;
+  border-color: rgba(228, 155, 32, 0.45);
+  box-shadow: 0 14px 34px rgba(228, 155, 32, 0.16);
+}
+
+.v4-issue-beacon--sewing span { color: #9a6810; }
+.v4-issue-beacon--sewing strong { color: #835a15; }
+
 .v4-issue-beacon span,
 .v4-issue-beacon strong,
 .v4-issue-beacon small {

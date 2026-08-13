@@ -510,3 +510,18 @@ export interface HealthProblem {
   traceNodeIds: LifecycleNodeId[]
   traceConfirmation: 'confirmed' | 'pending'
 }
+
+export interface ProblemAnalysisProfile {
+  problemId: string
+  evidence: {
+    title: string
+    metricLabel: string
+    unit: string
+    threshold: string
+    source: string
+    labels: string[]
+    values: number[]
+  }
+  candidateEvidence: readonly { category: string; completeness: number; priority: number; dataCondition: number; label: string }[]
+  actionCandidates: readonly { id: string; label: string; difficulty: number; impact: number; verificationHours: number; dataReadiness: number; category: string }[]
+}

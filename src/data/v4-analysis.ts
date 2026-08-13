@@ -8,6 +8,7 @@ import type {
   PeriodComparison,
   PeriodKey,
   PeriodMetric,
+  ProblemAnalysisProfile,
   StabilityAssessment,
 } from '../types'
 import { alertRuleConfigRaw, calculateStabilityAssessmentRaw } from './v4-rules-raw.mjs'
@@ -110,6 +111,63 @@ export const actionCandidates = [
   { id: 'AC-05', label: '缩短巡检间隔', difficulty: 56, impact: 72, verificationHours: 8, dataReadiness: 76, category: '管理' },
 ] as const
 
+const sewingCandidateEvidence: ProblemAnalysisProfile['candidateEvidence'] = [
+  { category: '工艺', completeness: 78, priority: 94, dataCondition: 72, label: '瓶颈工位实绩节拍' },
+  { category: '人员', completeness: 56, priority: 58, dataCondition: 64, label: '当班出勤与岗位变更事实' },
+  { category: '设备', completeness: 68, priority: 82, dataCondition: 76, label: '关键机台停机记录' },
+  { category: '物料', completeness: 61, priority: 66, dataCondition: 58, label: '前工序供料连续性' },
+  { category: '管理', completeness: 49, priority: 74, dataCondition: 52, label: '小时线平衡复核记录' },
+]
+
+const sewingActionCandidates: ProblemAnalysisProfile['actionCandidates'] = [
+  { id: 'SEW-AC-01', label: '确认瓶颈工位节拍', difficulty: 24, impact: 91, verificationHours: 1, dataReadiness: 78, category: '工艺' },
+  { id: 'SEW-AC-02', label: '拆分超时在制', difficulty: 38, impact: 86, verificationHours: 1, dataReadiness: 84, category: '管理' },
+  { id: 'SEW-AC-03', label: '核对关键机台停机', difficulty: 31, impact: 69, verificationHours: 2, dataReadiness: 76, category: '设备' },
+  { id: 'SEW-AC-04', label: '核对排班与临时调岗', difficulty: 28, impact: 58, verificationHours: 2, dataReadiness: 64, category: '人员' },
+  { id: 'SEW-AC-05', label: '复核前工序供料间隔', difficulty: 46, impact: 63, verificationHours: 3, dataReadiness: 58, category: '物料' },
+]
+
+export const problemAnalysisProfiles: Record<string, ProblemAnalysisProfile> = {
+  'P-QA-01': {
+    problemId: 'P-QA-01',
+    evidence: { title: '不良率趋势与三次预警事件', metricLabel: '缝皱不良率', unit: '%', threshold: '单窗口 > 2.0%', source: '演示：QC2-1检验记录 / 质量预警事件', labels: ['08:00', '09:00', '10:00', '11:00', '12:00', '13:00', '14:00'], values: [1.2, 2.4, 1.6, 2.8, 1.9, 3.1, 2.7] },
+    candidateEvidence,
+    actionCandidates,
+  },
+  'P-SEW-01': {
+    problemId: 'P-SEW-01',
+    evidence: { title: '超时在制趋势与待干预事件', metricLabel: '超时在制', unit: 'pcs', threshold: '管理阈值 > 180 pcs', source: '演示：MES在制记录 / 工序进出站时间', labels: ['08:00', '09:00', '10:00', '11:00', '12:00', '13:00', '14:00'], values: [96, 112, 138, 164, 188, 214, 206] },
+    candidateEvidence: sewingCandidateEvidence,
+    actionCandidates: sewingActionCandidates,
+  },
+}
+
+export function getProblemAnalysisProfile(problemId: string): ProblemAnalysisProfile {
+  return problemAnalysisProfiles[problemId] ?? problemAnalysisProfiles['P-QA-01']
+}
+
+export function getInterventionCaseForProblem(problem: HealthProblem): InterventionCase {
+  if (problem.id === currentInterventionCase.problemId) return currentInterventionCase
+  const latest = problem.alertEvents[problem.alertEvents.length - 1]
+  return {
+    id: `IC-${problem.id.replace('P-', '')}`,
+    problemId: problem.id,
+    alertEventId: latest?.id ?? '',
+    status: 'pending-intervention',
+    generatedAt: `${problem.identity.lastOccurredAt}:00`,
+    suggestedChecks: problem.plan,
+    suggestedRole: problem.suggestedRole,
+    verificationCondition: problem.verificationRequirement,
+    interventionStartedAt: null,
+    verifiedAt: null,
+    actualMeasureRecorded: false,
+    requiredEvidenceComplete: false,
+    evidenceCompleteness: 46,
+    coordinationActionsCompleted: 1,
+    coordinationActionsTotal: 4,
+  }
+}
+
 export function findProblemCase(problem: HealthProblem) {
-  return problem.id === currentInterventionCase.problemId ? currentInterventionCase : null
+  return problem.id === currentInterventionCase.problemId ? currentInterventionCase : getInterventionCaseForProblem(problem)
 }

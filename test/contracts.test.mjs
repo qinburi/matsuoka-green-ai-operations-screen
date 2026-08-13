@@ -253,6 +253,26 @@ test('V4问题关联页使用固定事实说明区和醒目主操作', () => {
   assert.match(versionSource, /放大问题关联事实说明区/)
 })
 
+test('V4同时提供品质与缝制问题入口并按问题切换分析内容', () => {
+  const viewSource = readProjectFile('src/views/V4HealthInterventionView.vue')
+  const dataSource = readProjectFile('src/data/v4-health-center.ts')
+  const analysisSource = readProjectFile('src/data/v4-analysis.ts')
+  const chartSource = readProjectFile('src/v4-chart-options.ts')
+
+  assert.match(viewSource, /openProblem\('P-QA-01'\)/)
+  assert.match(viewSource, /openProblem\('P-SEW-01'\)/)
+  assert.match(viewSource, /requestedProblem.*problemById\.has/)
+  assert.match(viewSource, /selectedRelationNodeId\.value = problemValue/)
+  assert.match(viewSource, /priorityAction = computed\(\(\) => activeProblem\.value\.plan\[0\]/)
+  assert.match(viewSource, /activeProblem\.facts\.length/)
+  assert.match(dataSource, /id: 'P-SEW-01'.*title: '缝制三组在制持续超时'/s)
+  assert.match(analysisSource, /'P-SEW-01': \{/)
+  assert.match(analysisSource, /超时在制趋势与待干预事件/)
+  assert.match(analysisSource, /MES在制记录 \/ 工序进出站时间/)
+  assert.match(chartSource, /problems: HealthProblem\[\] = \[problem\]/)
+  assert.match(chartSource, /problems\.map\(\(item\)/)
+})
+
 test('V4异常数据状态暂停问题结论且保留生命周期状态', () => {
   const viewSource = readProjectFile('src/views/V4HealthInterventionView.vue')
   const typeSource = readProjectFile('src/types.ts')

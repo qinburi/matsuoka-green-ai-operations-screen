@@ -7,6 +7,7 @@ import type {
   PeriodComparison,
   PeriodKey,
   PeriodMetric,
+  ProblemAnalysisProfile,
 } from './types'
 
 const palette = {
@@ -67,6 +68,7 @@ export function buildLifecycleCanvasOption(
   nodes: LifecycleNode[],
   selectedNodeId: LifecycleNodeId,
   problem: HealthProblem,
+  problems: HealthProblem[] = [problem],
 ): EChartsOption {
   const graphNodes = nodes.map((node, index) => ({
     id: node.id,
@@ -100,25 +102,25 @@ export function buildLifecycleCanvasOption(
     },
   }))
 
-  const issueNode = {
-    id: problem.id,
-    problemId: problem.id,
-    nodeId: problem.nodeId,
+  const issueNodes = problems.map((item, index) => ({
+    id: item.id,
+    problemId: item.id,
+    nodeId: item.nodeId,
     nodeType: 'issue',
-    name: problem.title,
-    x: 7 * 118,
-    y: 42,
+    name: item.title,
+    x: item.nodeId === 'sewing' ? 4 * 118 : 7 * 118,
+    y: item.nodeId === 'sewing' ? 70 : 42 + index * 2,
     symbol: 'circle',
-    symbolSize: 38,
+    symbolSize: item.nodeId === 'sewing' ? 34 : 38,
     itemStyle: {
-      color: palette.danger,
+      color: item.severity === 'critical' ? palette.danger : palette.amber,
       borderColor: palette.white,
       borderWidth: 4,
       shadowBlur: 24,
-      shadowColor: 'rgba(229,66,77,.56)',
+      shadowColor: item.severity === 'critical' ? 'rgba(229,66,77,.56)' : 'rgba(228,155,32,.42)',
     },
-    label: { show: true, formatter: '!', color: palette.white, fontSize: 20, fontWeight: 800 },
-  }
+    label: { show: true, formatter: '!', color: palette.white, fontSize: 18, fontWeight: 800 },
+  }))
   const paddingNodes = [
     { id: 'padding-left', name: '', x: -82, y: 300, symbolSize: 1, itemStyle: { opacity: 0 }, label: { show: false }, tooltip: { show: false } },
     { id: 'padding-right', name: '', x: 1144, y: 300, symbolSize: 1, itemStyle: { opacity: 0 }, label: { show: false }, tooltip: { show: false } },
@@ -133,7 +135,10 @@ export function buildLifecycleCanvasOption(
       borderColor: 'rgba(116,216,238,.58)',
       textStyle: { color: '#fff', fontSize: 12 },
       formatter: (params: any) => {
-        if (params.data?.nodeType === 'issue') return `<b>${problem.title}</b><br/>${problem.impactValue} ${problem.impactUnit} · 三次警报<br/>点击查看已记录证据`
+        if (params.data?.nodeType === 'issue') {
+          const item = problems.find((candidate) => candidate.id === params.data.problemId) ?? problem
+          return `<b>${item.title}</b><br/>${item.impactValue} ${item.impactUnit} · ${item.alertEvents[item.alertEvents.length - 1]?.levelLabel ?? '问题提示'}<br/>点击查看已记录证据`
+        }
         const node = nodes.find((item) => item.id === params.data?.nodeId)
         return node ? `<b>${node.label}</b><br/>${node.coreMetric.definition}<br/>来源：${node.dataSource}` : ''
       },
@@ -174,14 +179,14 @@ export function buildLifecycleCanvasOption(
         edgeSymbol: ['none', 'arrow'],
         edgeSymbolSize: [0, 8],
         emphasis: { focus: 'adjacency', scale: 1.04 },
-        data: [...graphNodes, issueNode, ...paddingNodes],
+        data: [...graphNodes, ...issueNodes, ...paddingNodes],
         links: [
           ...lifecycleEdges(nodes),
-          {
-            source: problem.id,
-            target: problem.nodeId,
-            lineStyle: { color: palette.danger, width: 2, type: 'dashed', opacity: 0.76, curveness: 0.08 },
-          },
+          ...problems.map((item) => ({
+            source: item.id,
+            target: item.nodeId,
+            lineStyle: { color: item.severity === 'critical' ? palette.danger : palette.amber, width: 2, type: 'dashed' as const, opacity: 0.76, curveness: 0.08 },
+          })),
         ],
         lineStyle: { color: palette.cyan, width: 2, opacity: 0.6 },
       },
@@ -266,7 +271,7 @@ export function buildProblemFocusOption(
     nodeId: problem.nodeId,
     nodeType: 'issue-focus',
     relationType: 'alert-fact',
-    source: '演示：质量预警事件',
+    source: problem.facts[0]?.source ?? '演示：问题事件记录',
     detail: problem.summary,
     name: problem.title,
     x: 440,
@@ -433,9 +438,9 @@ export function buildPeriodComparisonOption(
   }
 }
 
-export function buildEvidenceTrendOption(problem: HealthProblem): EChartsOption {
-  const labels = ['08:00', '09:00', '10:00', '11:00', '12:00', '13:00', '14:00']
-  const values = [1.2, 2.4, 1.6, 2.8, 1.9, 3.1, 2.7]
+export function buildEvidenceTrendOption(profile: ProblemAnalysisProfile, problem: HealthProblem): EChartsOption {
+  const labels = profile.evidence.labels
+  const values = profile.evidence.values
   const alertPoints = problem.alertEvents.map((event, index) => ({
     name: event.levelLabel,
     value: [event.occurredAt.slice(0, 2) + ':00', values[Math.min(index * 2 + 1, values.length - 1)]],
@@ -446,13 +451,13 @@ export function buildEvidenceTrendOption(problem: HealthProblem): EChartsOption 
   return {
     animationDuration: 860,
     grid: { left: 48, right: 22, top: 42, bottom: 42 },
-    tooltip: { ...lightTooltip, trigger: 'axis', valueFormatter: (value: unknown) => `${value}%` },
+    tooltip: { ...lightTooltip, trigger: 'axis', valueFormatter: (value: unknown) => `${value}${profile.evidence.unit}` },
     xAxis: { type: 'category', boundaryGap: false, data: labels, ...cartesianAxis },
-    yAxis: { type: 'value', name: '缝皱不良率 %', min: 0, max: 4, ...cartesianAxis },
+    yAxis: { type: 'value', name: `${profile.evidence.metricLabel} ${profile.evidence.unit}`, min: 0, max: profile.evidence.unit === '%' ? 4 : 240, ...cartesianAxis },
     series: [
       {
         type: 'line',
-        name: '缝皱不良率',
+        name: profile.evidence.metricLabel,
         data: values,
         smooth: 0.28,
         symbolSize: 6,
@@ -460,7 +465,7 @@ export function buildEvidenceTrendOption(problem: HealthProblem): EChartsOption 
         itemStyle: { color: palette.white, borderColor: palette.cyan, borderWidth: 2 },
         areaStyle: { color: 'rgba(22,168,213,.09)' },
         markArea: { silent: true, itemStyle: { color: 'rgba(229,66,77,.055)' }, data: [[{ xAxis: '09:00' }, { xAxis: '14:00' }]] },
-        markLine: { silent: true, symbol: ['none', 'none'], label: { formatter: '标准阈值 2.0%', color: palette.amber, fontSize: 10 }, lineStyle: { color: palette.amber, type: 'dashed' }, data: [{ yAxis: 2 }] },
+        markLine: { silent: true, symbol: ['none', 'none'], label: { formatter: profile.evidence.threshold, color: palette.amber, fontSize: 10 }, lineStyle: { color: palette.amber, type: 'dashed' }, data: [{ yAxis: profile.evidence.unit === '%' ? 2 : 180 }] },
       },
       {
         type: 'scatter',
