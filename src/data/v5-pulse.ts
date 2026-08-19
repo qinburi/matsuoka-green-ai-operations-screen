@@ -1,10 +1,15 @@
 import type {
+  ClosureActorProfile,
   ClosureEvaluation,
+  ClosureStepKey,
+  LifecycleNodeId,
   ProblemClosureTimeline,
   ProblemOwnerProfile,
   ProblemTrendProfile,
   ProblemTrendSeries,
+  PulseLineKey,
   PulsePeriodKey,
+  PulseWorkshopKey,
 } from '../types'
 import { healthProblems } from './v4-health-center'
 import { buildCustomPulseRangeRaw, evaluatePulseClosureRaw } from './v5-pulse-raw.mjs'
@@ -17,6 +22,36 @@ export const pulsePeriodLabels: Record<PulsePeriodKey, string> = {
   month: '月',
   custom: '自定义',
 }
+
+export const pulseWorkshopOptions: ReadonlyArray<{
+  id: PulseWorkshopKey
+  label: string
+  nodeIds: readonly LifecycleNodeId[] | null
+}> = [
+  { id: 'all', label: '全部车间', nodeIds: null },
+  { id: 'cutting', label: '裁剪', nodeIds: ['cutting'] },
+  { id: 'sewing', label: '缝制', nodeIds: ['sewing'] },
+  { id: 'finishing', label: '后道', nodeIds: ['special-process', 'finishing', 'quality', 'packing'] },
+  { id: 'warehouse', label: '仓库', nodeIds: ['material-warehouse', 'finished-warehouse'] },
+]
+
+const allLineOption = [{ id: 'all' as const, label: '全部产线' }]
+export const pulseLineOptionsByWorkshop: Record<PulseWorkshopKey, ReadonlyArray<{ id: PulseLineKey; label: string }>> = {
+  all: allLineOption,
+  cutting: allLineOption,
+  sewing: [
+    ...allLineOption,
+    { id: 'sewing-1', label: '缝制一组' },
+    { id: 'sewing-3', label: '缝制三组' },
+    { id: 'sewing-6', label: '缝制六组' },
+  ],
+  finishing: allLineOption,
+  warehouse: allLineOption,
+}
+
+export const pulseProblemLineById = new Map<string, PulseLineKey>([
+  ['P-SEW-01', 'sewing-3'],
+])
 
 const dayLabels = Array.from({ length: 10 }, (_, index) => `${String(index + 8).padStart(2, '0')}:00`)
 
@@ -46,22 +81,32 @@ export const problemTrendProfiles: ProblemTrendProfile[] = healthProblems.map((p
 export const trendProfileByProblemId = new Map(problemTrendProfiles.map((profile) => [profile.problemId, profile]))
 
 const owners: ProblemOwnerProfile[] = [
-  { id: 'OWNER-QA', problemId: 'P-QA-01', displayName: 'QC组长（演示）', department: '品质部', role: '品质异常闭环负责人', avatarAsset: 'assets/avatars/v5-owner-quality.svg', isDemo: true },
-  { id: 'OWNER-SEW', problemId: 'P-SEW-01', displayName: '缝制三组组长（演示）', department: '缝制课', role: '在制与线平衡负责人', avatarAsset: 'assets/avatars/v5-owner-sewing.svg', isDemo: true },
-  { id: 'OWNER-CUT', problemId: 'P-CUT-01', displayName: '裁断组长（演示）', department: '裁断课', role: '裁片质量负责人', avatarAsset: 'assets/avatars/v5-owner-cutting.svg', isDemo: true },
-  { id: 'OWNER-PACK', problemId: 'P-PACK-01', displayName: '包装组长（演示）', department: '包装课', role: '包装复核负责人', avatarAsset: 'assets/avatars/v5-owner-packaging.svg', isDemo: true },
-  { id: 'OWNER-MAT', problemId: 'P-MAT-01', displayName: 'IQC组长（演示）', department: '资材部 / 品质部', role: '来料复核负责人', avatarAsset: 'assets/avatars/v5-owner-quality.svg', isDemo: true },
-  { id: 'OWNER-PLAN', problemId: 'P-PLAN-01', displayName: '生产主管（演示）', department: '生产管理', role: '计划执行负责人', avatarAsset: 'assets/avatars/v5-owner-sewing.svg', isDemo: true },
-  { id: 'OWNER-BUY', problemId: 'P-BUY-01', displayName: '采购担当（演示）', department: '采购部', role: '齐套风险负责人', avatarAsset: 'assets/avatars/v5-owner-packaging.svg', isDemo: true },
-  { id: 'OWNER-SPECIAL', problemId: 'P-SPECIAL-01', displayName: '特殊工艺组长（演示）', department: '特殊工艺课', role: '批次复核负责人', avatarAsset: 'assets/avatars/v5-owner-cutting.svg', isDemo: true },
-  { id: 'OWNER-FIN', problemId: 'P-FIN-01', displayName: '整理组长（演示）', department: '整理课', role: '节拍观察负责人', avatarAsset: 'assets/avatars/v5-owner-sewing.svg', isDemo: true },
-  { id: 'OWNER-QA2', problemId: 'P-QA-02', displayName: '终检组长（演示）', department: '品质部', role: '终检验证负责人', avatarAsset: 'assets/avatars/v5-owner-quality.svg', isDemo: true },
-  { id: 'OWNER-FG', problemId: 'P-FG-01', displayName: '成品仓管理员（演示）', department: '成品仓库', role: '放行状态负责人', avatarAsset: 'assets/avatars/v5-owner-packaging.svg', isDemo: true },
+  { id: 'OWNER-QA', problemId: 'P-QA-01', displayName: 'QC组长（演示）', department: '品质部', role: '品质异常闭环负责人', avatarAsset: 'assets/avatars/v5-owner-quality.svg', kind: 'demo-person', isDemo: true },
+  { id: 'OWNER-SEW', problemId: 'P-SEW-01', displayName: '缝制三组组长（演示）', department: '缝制课', role: '在制与线平衡负责人', avatarAsset: 'assets/avatars/v5-owner-sewing.svg', kind: 'demo-person', isDemo: true },
+  { id: 'OWNER-CUT', problemId: 'P-CUT-01', displayName: '裁断组长（演示）', department: '裁断课', role: '裁片质量负责人', avatarAsset: 'assets/avatars/v5-owner-cutting.svg', kind: 'demo-person', isDemo: true },
+  { id: 'OWNER-PACK', problemId: 'P-PACK-01', displayName: '包装组长（演示）', department: '包装课', role: '包装复核负责人', avatarAsset: 'assets/avatars/v5-owner-packaging.svg', kind: 'demo-person', isDemo: true },
+  { id: 'OWNER-MAT', problemId: 'P-MAT-01', displayName: 'IQC组长（演示）', department: '资材部 / 品质部', role: '来料复核负责人', avatarAsset: 'assets/avatars/v5-owner-quality.svg', kind: 'demo-person', isDemo: true },
+  { id: 'OWNER-PLAN', problemId: 'P-PLAN-01', displayName: '生产主管（演示）', department: '生产管理', role: '计划执行负责人', avatarAsset: 'assets/avatars/v5-owner-sewing.svg', kind: 'demo-person', isDemo: true },
+  { id: 'OWNER-BUY', problemId: 'P-BUY-01', displayName: '采购担当（演示）', department: '采购部', role: '齐套风险负责人', avatarAsset: 'assets/avatars/v5-owner-packaging.svg', kind: 'demo-person', isDemo: true },
+  { id: 'OWNER-SPECIAL', problemId: 'P-SPECIAL-01', displayName: '特殊工艺组长（演示）', department: '特殊工艺课', role: '批次复核负责人', avatarAsset: 'assets/avatars/v5-owner-cutting.svg', kind: 'demo-person', isDemo: true },
+  { id: 'OWNER-FIN', problemId: 'P-FIN-01', displayName: '整理组长（演示）', department: '整理课', role: '节拍观察负责人', avatarAsset: 'assets/avatars/v5-owner-sewing.svg', kind: 'demo-person', isDemo: true },
+  { id: 'OWNER-QA2', problemId: 'P-QA-02', displayName: '终检组长（演示）', department: '品质部', role: '终检验证负责人', avatarAsset: 'assets/avatars/v5-owner-quality.svg', kind: 'demo-person', isDemo: true },
+  { id: 'OWNER-FG', problemId: 'P-FG-01', displayName: '成品仓管理员（演示）', department: '成品仓库', role: '放行状态负责人', avatarAsset: 'assets/avatars/v5-owner-packaging.svg', kind: 'demo-person', isDemo: true },
 ]
 
 export const ownerByProblemId = new Map(owners.map((owner) => [owner.problemId, owner]))
 
-const timelines: ProblemClosureTimeline[] = [
+const supportingActors: ClosureActorProfile[] = [
+  { id: 'ACTOR-RECORDER', displayName: '异常记录员（演示）', department: '现场检验 / 生产记录', role: '发现并记录异常事实', avatarAsset: 'assets/avatars/v5-actor-recorder.svg', kind: 'demo-person', isDemo: true },
+  { id: 'ACTOR-HANDLER', displayName: '现场处理员（演示）', department: '责任工序', role: '执行并记录实际措施', avatarAsset: 'assets/avatars/v5-actor-handler.svg', kind: 'demo-person', isDemo: true },
+  { id: 'ACTOR-VERIFIER', displayName: '验证专员（演示）', department: '品质 / 生产管理', role: '复核验证条件与证据', avatarAsset: 'assets/avatars/v5-actor-verifier.svg', kind: 'demo-person', isDemo: true },
+  { id: 'ACTOR-SYSTEM', displayName: '系统监测（演示）', department: 'MES / QMS', role: '自动记录异常事件', avatarAsset: 'assets/avatars/v5-actor-system.svg', kind: 'system', isDemo: true },
+  { id: 'ACTOR-UNASSIGNED', displayName: '待认领', department: '尚未关联人员', role: '等待对应岗位完成当前节点', avatarAsset: 'assets/avatars/v5-actor-unassigned.svg', kind: 'unassigned', isDemo: true },
+]
+
+export const closureActorById = new Map<string, ClosureActorProfile>([...owners, ...supportingActors].map((actor) => [actor.id, actor]))
+
+const rawTimelines: Array<Omit<ProblemClosureTimeline, 'actors'>> = [
   { problemId: 'P-QA-01', ownerId: 'OWNER-QA', occurredAt: '2026-08-12T13:52:00+08:00', responseAt: null, handledAt: null, verifiedAt: null, responseTargetAt: '2026-08-12T14:07:00+08:00', resolutionTargetAt: '2026-08-12T16:00:00+08:00', status: 'pending', actualMeasure: null, verificationEvidence: null, evidenceComplete: false, recurredAt: null, isDemo: true },
   { problemId: 'P-SEW-01', ownerId: 'OWNER-SEW', occurredAt: '2026-08-12T12:46:00+08:00', responseAt: '2026-08-12T13:02:00+08:00', handledAt: '2026-08-12T14:08:00+08:00', verifiedAt: null, responseTargetAt: '2026-08-12T13:06:00+08:00', resolutionTargetAt: '2026-08-12T15:00:00+08:00', status: 'processing', actualMeasure: '核对瓶颈工位并临时拆分超时在制', verificationEvidence: null, evidenceComplete: false, recurredAt: null, isDemo: true },
   { problemId: 'P-QA-02', ownerId: 'OWNER-QA2', occurredAt: '2026-08-12T12:22:00+08:00', responseAt: '2026-08-12T12:28:00+08:00', handledAt: '2026-08-12T12:36:00+08:00', verifiedAt: '2026-08-12T15:00:00+08:00', responseTargetAt: '2026-08-12T12:37:00+08:00', resolutionTargetAt: '2026-08-12T15:22:00+08:00', status: 'verified', actualMeasure: '清洁检验台并调整转运防护', verificationEvidence: '连续两个检验窗口未发现同类污渍', evidenceComplete: true, recurredAt: null, isDemo: true },
@@ -74,6 +119,19 @@ const timelines: ProblemClosureTimeline[] = [
   { problemId: 'P-SPECIAL-01', ownerId: 'OWNER-SPECIAL', occurredAt: '2026-08-12T13:12:00+08:00', responseAt: '2026-08-12T13:30:00+08:00', handledAt: '2026-08-12T14:05:00+08:00', verifiedAt: null, responseTargetAt: '2026-08-12T13:42:00+08:00', resolutionTargetAt: '2026-08-12T16:00:00+08:00', status: 'processing', actualMeasure: '补齐批次工艺与品质交接记录', verificationEvidence: null, evidenceComplete: false, recurredAt: null, isDemo: true },
   { problemId: 'P-FG-01', ownerId: 'OWNER-FG', occurredAt: '2026-08-12T13:36:00+08:00', responseAt: '2026-08-12T13:52:00+08:00', handledAt: null, verifiedAt: null, responseTargetAt: '2026-08-12T14:06:00+08:00', resolutionTargetAt: '2026-08-12T16:30:00+08:00', status: 'processing', actualMeasure: null, verificationEvidence: null, evidenceComplete: false, recurredAt: null, isDemo: true },
 ]
+
+const systemDetectedProblems = new Set(['P-SEW-01', 'P-PLAN-01', 'P-FG-01'])
+const buildStepActor = (step: ClosureStepKey, actorId: string | null, source: string) => ({ step, actorId, source })
+
+const timelines: ProblemClosureTimeline[] = rawTimelines.map((timeline) => ({
+  ...timeline,
+  actors: {
+    occurred: buildStepActor('occurred', systemDetectedProblems.has(timeline.problemId) ? 'ACTOR-SYSTEM' : 'ACTOR-RECORDER', systemDetectedProblems.has(timeline.problemId) ? '演示：MES/QMS自动监测事件' : '演示：现场异常记录'),
+    response: buildStepActor('response', timeline.responseAt ? timeline.ownerId : null, timeline.responseAt ? '演示：首次响应记录' : '尚未形成响应记录'),
+    handled: buildStepActor('handled', timeline.handledAt ? 'ACTOR-HANDLER' : null, timeline.handledAt ? '演示：实际措施记录' : '尚未形成处理记录'),
+    verified: buildStepActor('verified', timeline.verifiedAt ? 'ACTOR-VERIFIER' : null, timeline.verifiedAt ? '演示：验证证据记录' : '尚未形成验证记录'),
+  },
+}))
 
 export const timelineByProblemId = new Map(timelines.map((timeline) => [timeline.problemId, timeline]))
 

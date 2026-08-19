@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-label="Generic verification specialist avatar">
+  <rect width="128" height="128" rx="32" fill="#EAF7F2"/>
+  <circle cx="64" cy="47" r="24" fill="#F0BE99"/>
+  <path d="M40 48c0-22 11-34 28-34s28 12 28 33c-12-3-21-11-26-20-6 12-16 19-30 21Z" fill="#273740"/>
+  <path d="M25 119c3-29 18-44 39-44s36 15 39 44" fill="#168C70"/>
+  <circle cx="94" cy="92" r="15" fill="#FFFFFF" stroke="#11735D" stroke-width="3"/>
+  <path d="m87 92 5 5 10-12" fill="none" stroke="#11735D" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

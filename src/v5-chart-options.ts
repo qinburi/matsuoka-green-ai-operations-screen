@@ -45,7 +45,7 @@ export function buildPulseTrendOption(
           symbol: 'circle',
           symbolSize: 14,
           itemStyle: { color: stage.color, borderColor: '#ffffff', borderWidth: 3, shadowBlur: 10, shadowColor: `${stage.color}66` },
-          label: { show: true, position: 'top' as const, formatter: stage.name, color: stage.color, fontSize: 10, fontWeight: 700 },
+          label: { show: true, position: 'top' as const, distance: 22, formatter: stage.name, color: stage.color, fontSize: 10, fontWeight: 700 },
         }]
       })
     : []
@@ -104,6 +104,18 @@ export function buildPulseTrendOption(
         data: snapshot.currentValues,
         lineStyle: { color: colors.danger, width: 3.5 },
         itemStyle: { color: colors.danger, borderColor: '#ffffff', borderWidth: 2 },
+        label: {
+          show: snapshot.labels.length <= 14,
+          position: 'top',
+          distance: 7,
+          formatter: `{c}${profile.unit}`,
+          color: colors.danger,
+          fontSize: 10,
+          fontWeight: 700,
+          backgroundColor: 'rgba(255,255,255,.86)',
+          borderRadius: 2,
+          padding: [2, 3],
+        },
         areaStyle: { color: 'rgba(223,53,70,.065)' },
         markArea: {
           silent: true,

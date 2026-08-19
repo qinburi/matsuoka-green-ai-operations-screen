@@ -319,6 +319,10 @@ export type PulseGranularity = 'hour' | 'day' | 'week'
 export type PulseAggregation = 'average' | 'peak' | 'sum'
 export type ClosureEvaluationLevel = 'pending' | 'excellent' | 'good' | 'unqualified'
 export type PulseCaseStatus = 'pending' | 'processing' | 'verified' | 'failed' | 'recurred'
+export type PulseWorkshopKey = 'all' | 'cutting' | 'sewing' | 'finishing' | 'warehouse'
+export type PulseLineKey = 'all' | 'sewing-1' | 'sewing-3' | 'sewing-6'
+export type ClosureStepKey = 'occurred' | 'response' | 'handled' | 'verified'
+export type ClosureActorKind = 'demo-person' | 'system' | 'unassigned'
 
 export interface LifecycleMetric {
   label: string
@@ -575,19 +579,31 @@ export interface ProblemTrendProfile {
   dayComparison: number[]
 }
 
-export interface ProblemOwnerProfile {
+export interface ClosureActorProfile {
   id: string
-  problemId: string
   displayName: string
   department: string
   role: string
   avatarAsset: string
+  kind: ClosureActorKind
   isDemo: true
+}
+
+export interface ProblemOwnerProfile extends ClosureActorProfile {
+  problemId: string
+  kind: 'demo-person'
+}
+
+export interface ClosureStepActor {
+  step: ClosureStepKey
+  actorId: string | null
+  source: string
 }
 
 export interface ProblemClosureTimeline {
   problemId: string
   ownerId: string
+  actors: Record<ClosureStepKey, ClosureStepActor>
   occurredAt: string
   responseAt: string | null
   handledAt: string | null

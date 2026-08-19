@@ -103,8 +103,16 @@ test('V5使用问题脉搏单屏且V4保留完整历史分析页', () => {
   assert.match(viewSource, /问题闭环时间节点/)
   assert.match(viewSource, /问题清单/)
   assert.match(viewSource, /当前责任人/)
+  assert.match(viewSource, /class="v5-context-summary"/)
+  assert.match(viewSource, /aria-label="车间"/)
+  assert.match(viewSource, /aria-label="产线"/)
   assert.match(viewSource, /buildPulseTrendOption/)
   assert.match(viewSource, /buildPulseEfficiencyGaugeOption/)
+  assert.match(viewSource, /v5-evaluation-scale/)
+  assert.match(viewSource, />优秀<\/span>/)
+  assert.match(viewSource, />良好<\/span>/)
+  assert.match(viewSource, />不合格<\/span>/)
+  assert.match(readProjectFile('src/v5-chart-options.ts'), /formatter: `\{c\}\$\{profile\.unit\}`/)
   assert.match(viewSource, /\(\) => route\.query\.problem, \(\) => route\.query\.focus/)
   assert.match(viewSource, /\(\) => route\.query\.from, \(\) => route\.query\.to/)
   assert.match(viewSource, /window\.clearTimeout\(loadingTimer\)/)
@@ -113,6 +121,27 @@ test('V5使用问题脉搏单屏且V4保留完整历史分析页', () => {
   assert.match(styleSource, /@media \(max-width: 1179px\)/)
   assert.match(routerSource, /name: 'v4-analysis', component: V4HealthInterventionView/)
   assert.match(overviewSource, /'v4\.0\.0': 'v4-analysis'/)
+})
+
+test('V5车间与产线使用独立配置并驱动全屏问题范围', () => {
+  const dataSource = readProjectFile('src/data/v5-pulse.ts')
+  const viewSource = readProjectFile('src/views/V5PulseView.vue')
+  const typeSource = readProjectFile('src/types.ts')
+
+  assert.match(typeSource, /PulseWorkshopKey = 'all' \| 'cutting' \| 'sewing' \| 'finishing' \| 'warehouse'/)
+  assert.match(typeSource, /PulseLineKey = 'all' \| 'sewing-1' \| 'sewing-3' \| 'sewing-6'/)
+  for (const label of ['全部车间', '裁剪', '缝制', '后道', '仓库']) assert.match(dataSource, new RegExp(`label: '${label}'`))
+  assert.match(dataSource, /finishing[\s\S]*?nodeIds: \['special-process', 'finishing', 'quality', 'packing'\]/)
+  assert.match(dataSource, /warehouse[\s\S]*?nodeIds: \['material-warehouse', 'finished-warehouse'\]/)
+  assert.match(dataSource, /\['P-SEW-01', 'sewing-3'\]/)
+  assert.match(viewSource, /problemMatchesScope/)
+  assert.match(viewSource, /const scopedRows = computed/)
+  assert.match(viewSource, /pending: scopedRows\.value/)
+  assert.match(viewSource, /problem: nextProblemId \|\| undefined/)
+  assert.match(viewSource, /workshop: selectedWorkshop\.value/)
+  assert.match(viewSource, /line: selectedLine\.value/)
+  assert.match(viewSource, /当前车间与产线没有问题记录/)
+  assert.doesNotMatch(viewSource, /contextOptions\.factories|contextOptions\.lines/)
 })
 
 test('V5日周月自定义曲线具有稳定口径和桌面时段', () => {
@@ -169,7 +198,18 @@ test('V5责任人头像为本地演示资源且绿色对钩只属于验证解决
   const dataSource = readProjectFile('src/data/v5-pulse.ts')
   const viewSource = readProjectFile('src/views/V5PulseView.vue')
   const styleSource = readProjectFile('src/v5-pulse.css')
-  const avatars = ['v5-owner-quality.svg', 'v5-owner-sewing.svg', 'v5-owner-cutting.svg', 'v5-owner-packaging.svg']
+  const typeSource = readProjectFile('src/types.ts')
+  const avatars = [
+    'v5-owner-quality.svg',
+    'v5-owner-sewing.svg',
+    'v5-owner-cutting.svg',
+    'v5-owner-packaging.svg',
+    'v5-actor-recorder.svg',
+    'v5-actor-handler.svg',
+    'v5-actor-verifier.svg',
+    'v5-actor-system.svg',
+    'v5-actor-unassigned.svg',
+  ]
 
   for (const avatar of avatars) {
     assert.ok(existsSync(new URL(`../public/assets/avatars/${avatar}`, import.meta.url)))
@@ -179,6 +219,17 @@ test('V5责任人头像为本地演示资源且绿色对钩只属于验证解决
   assert.match(viewSource, /return '✓'/)
   assert.match(styleSource, /\.v5-problem-row\.is-resolved/)
   assert.match(styleSource, /@keyframes v5-resolved-check/)
+  assert.match(typeSource, /ClosureStepKey = 'occurred' \| 'response' \| 'handled' \| 'verified'/)
+  assert.match(typeSource, /actors: Record<ClosureStepKey, ClosureStepActor>/)
+  assert.match(dataSource, /response: buildStepActor\('response', timeline\.responseAt \? timeline\.ownerId : null/)
+  assert.match(dataSource, /handled: buildStepActor\('handled', timeline\.handledAt \? 'ACTOR-HANDLER' : null/)
+  assert.match(dataSource, /verified: buildStepActor\('verified', timeline\.verifiedAt \? 'ACTOR-VERIFIER' : null/)
+  assert.match(viewSource, /class="v5-step-actor"/)
+  assert.match(viewSource, /step\.actor\.kind/)
+  assert.match(viewSource, /:data-detail=/)
+  assert.match(viewSource, /displayDateTime\(step\.at\)/)
+  assert.match(viewSource, /ACTOR-UNASSIGNED/)
+  assert.match(styleSource, /\.v5-step-actor\.is-unassigned/)
   assert.match(dataSource, /isDemo: true/)
   assert.doesNotMatch(viewSource, /发送消息|企业微信|员工能力|员工态度/)
 })

@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-label="System monitoring avatar">
+  <rect width="128" height="128" rx="32" fill="#EAF4F8"/>
+  <rect x="25" y="27" width="78" height="70" rx="22" fill="#253A45"/>
+  <rect x="34" y="37" width="60" height="50" rx="15" fill="#F7FCFD"/>
+  <circle cx="51" cy="61" r="6" fill="#24A7C5"/>
+  <circle cx="77" cy="61" r="6" fill="#24A7C5"/>
+  <path d="M50 75h28" stroke="#16809A" stroke-width="4" stroke-linecap="round"/>
+  <path d="M64 27V15M57 15h14" stroke="#253A45" stroke-width="5" stroke-linecap="round"/>
+  <path d="M43 111h42" stroke="#253A45" stroke-width="8" stroke-linecap="round"/>
+</svg>

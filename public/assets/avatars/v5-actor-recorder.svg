@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-label="Generic issue recorder avatar">
+  <rect width="128" height="128" rx="32" fill="#EAF6FA"/>
+  <circle cx="64" cy="47" r="24" fill="#F2C3A1"/>
+  <path d="M40 47c0-21 11-33 27-33 17 0 28 12 28 32-11-3-19-10-25-20-5 11-15 18-30 21Z" fill="#263842"/>
+  <path d="M26 119c3-29 17-44 38-44s35 15 38 44" fill="#269DB8"/>
+  <rect x="82" y="76" width="25" height="31" rx="4" fill="#FFFFFF" stroke="#167D95" stroke-width="3"/>
+  <path d="M88 86h13M88 93h10" stroke="#167D95" stroke-width="3" stroke-linecap="round"/>
+</svg>

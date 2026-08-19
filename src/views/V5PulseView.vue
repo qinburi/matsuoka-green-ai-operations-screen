@@ -3,20 +3,24 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import EChart from '../components/EChart.vue'
 import VersionDialog from '../components/VersionDialog.vue'
-import { contextOptions, sourceLabels, stateLabels } from '../data/demo'
+import { sourceLabels, stateLabels } from '../data/demo'
 import { healthProblems, lifecycleById, problemById } from '../data/v4-health-center'
 import {
+  closureActorById,
   closureEvaluationByProblemId,
   getProblemTrendSeries,
   ownerByProblemId,
+  pulseLineOptionsByWorkshop,
   pulseAsOf,
   pulsePeriodLabels,
+  pulseProblemLineById,
   pulseUpdatedAt,
+  pulseWorkshopOptions,
   timelineByProblemId,
   trendProfileByProblemId,
 } from '../data/v5-pulse'
 import { buildPulseEfficiencyGaugeOption, buildPulseTrendOption } from '../v5-chart-options'
-import type { ClosureEvaluation, DataState, ProblemClosureTimeline, PulseCaseStatus, PulsePeriodKey } from '../types'
+import type { ClosureEvaluation, ClosureStepKey, DataState, HealthProblem, ProblemClosureTimeline, PulseCaseStatus, PulseLineKey, PulsePeriodKey, PulseWorkshopKey } from '../types'
 
 const router = useRouter()
 const route = useRoute()
@@ -35,24 +39,48 @@ function queryValue(value: unknown) {
   return typeof value === 'string' ? value : ''
 }
 
-function problemIdFromRoute() {
+const workshopById = new Map(pulseWorkshopOptions.map((item) => [item.id, item]))
+
+function normalizeWorkshop(value: unknown): PulseWorkshopKey {
+  const requested = queryValue(value) as PulseWorkshopKey
+  return workshopById.has(requested) ? requested : 'all'
+}
+
+function normalizeLine(value: unknown, workshop: PulseWorkshopKey): PulseLineKey {
+  const requested = queryValue(value) as PulseLineKey
+  return pulseLineOptionsByWorkshop[workshop].some((item) => item.id === requested) ? requested : 'all'
+}
+
+function problemMatchesScope(problem: HealthProblem, workshop: PulseWorkshopKey, line: PulseLineKey) {
+  const nodeIds = workshopById.get(workshop)?.nodeIds ?? null
+  if (nodeIds && !nodeIds.includes(problem.nodeId)) return false
+  if (line !== 'all' && pulseProblemLineById.get(problem.id) !== line) return false
+  return true
+}
+
+function problemIdFromRoute(workshop: PulseWorkshopKey, line: PulseLineKey) {
+  const scopedIds = healthProblems.filter((problem) => problemMatchesScope(problem, workshop, line)).map((problem) => problem.id)
   const requested = queryValue(route.query.problem)
-  if (problemById.has(requested)) return requested
-  return focusProblemMap[queryValue(route.query.focus)] ?? 'P-QA-01'
+  if (scopedIds.includes(requested)) return requested
+  const focused = focusProblemMap[queryValue(route.query.focus)]
+  if (focused && scopedIds.includes(focused)) return focused
+  if (workshop === 'all' && line === 'all' && scopedIds.includes('P-QA-01')) return 'P-QA-01'
+  return scopedIds[0] ?? ''
 }
 
 function normalizePeriod(value: unknown): PulsePeriodKey {
   return ['today', 'week', 'month', 'custom'].includes(String(value)) ? value as PulsePeriodKey : 'today'
 }
 
-const selectedProblemId = ref(problemIdFromRoute())
+const selectedWorkshop = ref<PulseWorkshopKey>(normalizeWorkshop(route.query.workshop))
+const selectedLine = ref<PulseLineKey>(normalizeLine(route.query.line, selectedWorkshop.value))
+const selectedProblemId = ref(problemIdFromRoute(selectedWorkshop.value, selectedLine.value))
 const selectedPeriod = ref<PulsePeriodKey>(normalizePeriod(route.query.period))
 const customFrom = ref(queryValue(route.query.from) || '2026-08-01')
 const customTo = ref(queryValue(route.query.to) || '2026-08-12')
 const dataState = ref<DataState>('normal')
 const listFilter = ref<'all' | PulseCaseStatus>('all')
-const factory = ref(contextOptions.factories[0])
-const line = ref(contextOptions.lines[0])
+const lineOptions = computed(() => pulseLineOptionsByWorkshop[selectedWorkshop.value])
 
 const fallbackProblem = problemById.get('P-QA-01')!
 const activeProblem = computed(() => problemById.get(selectedProblemId.value) ?? fallbackProblem)
@@ -85,15 +113,18 @@ const closureRows = computed(() => healthProblems.flatMap((problem) => {
   return [{ problem, timeline, owner, evaluation }]
 }))
 
+const scopedRows = computed(() => closureRows.value.filter((row) => problemMatchesScope(row.problem, selectedWorkshop.value, selectedLine.value)))
+const hasScopedProblem = computed(() => scopedRows.value.length > 0)
+
 const filteredRows = computed(() => listFilter.value === 'all'
-  ? closureRows.value
-  : closureRows.value.filter((row) => row.timeline.status === listFilter.value))
+  ? scopedRows.value
+  : scopedRows.value.filter((row) => row.timeline.status === listFilter.value))
 
 const summary = computed(() => ({
-  pending: closureRows.value.filter((row) => row.timeline.status === 'pending').length,
-  processing: closureRows.value.filter((row) => row.timeline.status === 'processing').length,
-  overdue: closureRows.value.filter((row) => row.evaluation.overdue).length,
-  resolved: closureRows.value.filter((row) => row.timeline.status === 'verified' && row.evaluation.isResolved).length,
+  pending: scopedRows.value.filter((row) => row.timeline.status === 'pending').length,
+  processing: scopedRows.value.filter((row) => row.timeline.status === 'processing').length,
+  overdue: scopedRows.value.filter((row) => row.evaluation.overdue).length,
+  resolved: scopedRows.value.filter((row) => row.timeline.status === 'verified' && row.evaluation.isResolved).length,
 }))
 
 const listFilters: Array<{ id: 'all' | PulseCaseStatus; label: string }> = [
@@ -105,14 +136,21 @@ const listFilters: Array<{ id: 'all' | PulseCaseStatus; label: string }> = [
 ]
 
 const periodItems = (Object.keys(pulsePeriodLabels) as PulsePeriodKey[]).map((id) => ({ id, label: pulsePeriodLabels[id] }))
+const unassignedActor = closureActorById.get('ACTOR-UNASSIGNED')!
+const recordedActorsVisible = computed(() => dataState.value === 'normal' || dataState.value === 'stale')
 
 const timelineSteps = computed(() => {
   const timeline = activeTimeline.value
+  const actorFor = (step: ClosureStepKey) => {
+    const actorRef = timeline.actors[step]
+    return recordedActorsVisible.value && actorRef.actorId ? closureActorById.get(actorRef.actorId) ?? unassignedActor : unassignedActor
+  }
+  const stateFor = (state: 'done' | 'active' | 'pending' | 'failed') => recordedActorsVisible.value ? state : 'pending'
   return [
-    { id: 'occurred', label: '问题发生', at: timeline.occurredAt, note: '系统记录异常事实', state: 'done' },
-    { id: 'response', label: '首次响应', at: timeline.responseAt, note: timeline.responseAt ? `用时 ${activeEvaluation.value.responseMinutes ?? '--'} 分钟` : activeEvaluation.value.overdue ? '尚未响应 · 已超时' : '等待响应', state: timeline.responseAt ? 'done' : 'active' },
-    { id: 'handled', label: '实际处理', at: timeline.handledAt, note: timeline.actualMeasure ?? '等待记录实际措施', state: timeline.handledAt ? 'done' : timeline.responseAt ? 'active' : 'pending' },
-    { id: 'verified', label: '验证完成', at: timeline.verifiedAt, note: timeline.verificationEvidence ?? (timeline.status === 'recurred' ? '验证后再次复发' : '等待验证证据'), state: timeline.status === 'recurred' || timeline.status === 'failed' ? 'failed' : timeline.verifiedAt ? 'done' : timeline.handledAt ? 'active' : 'pending' },
+    { id: 'occurred' as const, label: '问题发生', at: recordedActorsVisible.value ? timeline.occurredAt : null, note: recordedActorsVisible.value ? timeline.actors.occurred.source : '当前数据状态不可读取人员记录', state: stateFor('done'), actor: actorFor('occurred') },
+    { id: 'response' as const, label: '首次响应', at: recordedActorsVisible.value ? timeline.responseAt : null, note: recordedActorsVisible.value ? timeline.responseAt ? `用时 ${activeEvaluation.value.responseMinutes ?? '--'} 分钟` : activeEvaluation.value.overdue ? '尚未响应 · 已超时' : '等待响应' : '当前数据状态不可读取人员记录', state: stateFor(timeline.responseAt ? 'done' : 'active'), actor: actorFor('response') },
+    { id: 'handled' as const, label: '实际处理', at: recordedActorsVisible.value ? timeline.handledAt : null, note: recordedActorsVisible.value ? timeline.actualMeasure ?? '等待记录实际措施' : '当前数据状态不可读取人员记录', state: stateFor(timeline.handledAt ? 'done' : timeline.responseAt ? 'active' : 'pending'), actor: actorFor('handled') },
+    { id: 'verified' as const, label: '验证完成', at: recordedActorsVisible.value ? timeline.verifiedAt : null, note: recordedActorsVisible.value ? timeline.status === 'recurred' ? '验证后再次复发' : timeline.verificationEvidence ?? '等待验证证据' : '当前数据状态不可读取人员记录', state: stateFor(timeline.status === 'recurred' || timeline.status === 'failed' ? 'failed' : timeline.verifiedAt ? 'done' : timeline.handledAt ? 'active' : 'pending'), actor: actorFor('verified') },
   ]
 })
 
@@ -154,7 +192,29 @@ function statusSymbol(timeline: ProblemClosureTimeline, evaluation: ClosureEvalu
 async function selectProblem(problemId: string) {
   if (problemId === selectedProblemId.value) return
   selectedProblemId.value = problemId
-  await router.push({ query: { ...route.query, problem: problemId, period: selectedPeriod.value, step: undefined } })
+  await router.push({ query: { ...route.query, problem: problemId, period: selectedPeriod.value, workshop: selectedWorkshop.value, line: selectedLine.value, step: undefined } })
+}
+
+async function updateScope() {
+  listFilter.value = 'all'
+  selectedLine.value = normalizeLine(selectedLine.value, selectedWorkshop.value)
+  const nextProblemId = problemIdFromRoute(selectedWorkshop.value, selectedLine.value)
+  selectedProblemId.value = nextProblemId
+  await router.replace({
+    query: {
+      ...route.query,
+      workshop: selectedWorkshop.value,
+      line: selectedLine.value,
+      problem: nextProblemId || undefined,
+      step: undefined,
+    },
+  })
+}
+
+async function resetScope() {
+  selectedWorkshop.value = 'all'
+  selectedLine.value = 'all'
+  await updateScope()
 }
 
 async function selectPeriod(period: PulsePeriodKey) {
@@ -184,7 +244,15 @@ function updateDataState() {
 }
 
 watch([() => route.query.problem, () => route.query.focus], () => {
-  selectedProblemId.value = problemIdFromRoute()
+  selectedProblemId.value = problemIdFromRoute(selectedWorkshop.value, selectedLine.value)
+})
+
+watch([() => route.query.workshop, () => route.query.line], ([workshop, line]) => {
+  const nextWorkshop = normalizeWorkshop(workshop)
+  const nextLine = normalizeLine(line, nextWorkshop)
+  selectedWorkshop.value = nextWorkshop
+  selectedLine.value = nextLine
+  selectedProblemId.value = problemIdFromRoute(nextWorkshop, nextLine)
 })
 
 watch(() => route.query.period, (value) => {
@@ -223,8 +291,6 @@ onBeforeUnmount(() => {
         <span>MATSUOKA GREEN AI · DEMO</span>
         <h1>态势感知 · 敏捷管控中心</h1>
       </div>
-      <label class="v5-compact-field"><span>工厂</span><select v-model="factory"><option v-for="item in contextOptions.factories" :key="item">{{ item }}</option></select></label>
-      <label class="v5-compact-field"><span>产线</span><select v-model="line"><option v-for="item in contextOptions.lines" :key="item">{{ item }}</option></select></label>
       <div class="v5-top-meta"><span>演示数据</span><strong>{{ pulseUpdatedAt }}</strong></div>
       <VersionDialog />
     </header>
@@ -245,6 +311,14 @@ onBeforeUnmount(() => {
     </section>
 
     <section class="v5-summary-strip" aria-label="问题闭环摘要">
+      <article class="v5-context-summary">
+        <span>车间</span>
+        <select v-model="selectedWorkshop" aria-label="车间" @change="updateScope"><option v-for="item in pulseWorkshopOptions" :key="item.id" :value="item.id">{{ item.label }}</option></select>
+      </article>
+      <article class="v5-context-summary">
+        <span>产线</span>
+        <select v-model="selectedLine" aria-label="产线" @change="updateScope"><option v-for="item in lineOptions" :key="item.id" :value="item.id">{{ item.label }}</option></select>
+      </article>
       <article><span>待处理</span><strong>{{ dataState === 'normal' || dataState === 'stale' ? summary.pending : '--' }}</strong><small>等待首次响应</small></article>
       <article><span>处理中</span><strong>{{ dataState === 'normal' || dataState === 'stale' ? summary.processing : '--' }}</strong><small>已响应待验证</small></article>
       <article class="is-danger"><span>已超时</span><strong>{{ dataState === 'normal' || dataState === 'stale' ? summary.overdue : '--' }}</strong><small>超过解决目标</small></article>
@@ -252,7 +326,8 @@ onBeforeUnmount(() => {
     </section>
 
     <section class="v5-workspace">
-      <section class="v5-main-stage">
+      <template v-if="hasScopedProblem">
+        <section class="v5-main-stage">
         <header class="v5-problem-heading">
           <div>
             <span class="v5-severity" :class="`is-${activeProblem.severity}`">{{ statusLabel(activeTimeline, activeEvaluation) }}</span>
@@ -284,14 +359,27 @@ onBeforeUnmount(() => {
           <header><div><span>CLOSURE TIMELINE</span><h3>问题闭环时间节点</h3></div><p>评价对象为本次问题闭环，不评价个人能力或态度</p></header>
           <div class="v5-timeline">
             <article v-for="step in timelineSteps" :key="step.id" :class="`is-${step.state}`">
-              <i>{{ step.state === 'done' ? '✓' : step.state === 'failed' ? '×' : step.state === 'active' ? '●' : '' }}</i>
-              <div><span>{{ step.label }}</span><strong>{{ displayDateTime(step.at) }}</strong><small>{{ step.note }}</small></div>
+              <div
+                class="v5-step-actor"
+                :class="`is-${step.actor.kind}`"
+                tabindex="0"
+                :aria-label="`${step.label}，${step.actor.displayName}，${step.actor.department}，${step.actor.role}，${displayDateTime(step.at)}，${step.note}`"
+                :data-detail="`${step.actor.displayName.replace('（演示）', '')} · ${step.actor.department} · ${step.actor.role} · ${step.label} ${displayDateTime(step.at)}`"
+                :title="`${step.actor.displayName}｜${step.actor.department}｜${step.actor.role}｜${step.label}｜${displayDateTime(step.at)}｜${step.note}`"
+              >
+                <img :src="avatarUrl(step.actor.avatarAsset)" :alt="`${step.label}：${step.actor.displayName}通用头像`" />
+                <span><strong>{{ step.actor.displayName.replace('（演示）', '') }}</strong><small>{{ step.actor.role }}</small></span>
+              </div>
+              <div class="v5-step-event">
+                <i>{{ step.state === 'done' ? '✓' : step.state === 'failed' ? '×' : step.state === 'active' ? '●' : '' }}</i>
+                <div><span>{{ step.label }}</span><strong>{{ displayDateTime(step.at) }}</strong><small>{{ step.note }}</small></div>
+              </div>
             </article>
           </div>
         </section>
-      </section>
+        </section>
 
-      <aside class="v5-side-panel">
+        <aside class="v5-side-panel">
         <section class="v5-owner-panel">
           <header><div><span>RESPONSIBLE OWNER</span><h2>当前责任人</h2></div><em>演示关联</em></header>
           <div class="v5-owner-main">
@@ -303,6 +391,11 @@ onBeforeUnmount(() => {
             <div class="v5-evaluation" :class="`is-${canEvaluate ? activeEvaluation.level : 'pending'}`">
               <span>闭环评价</span>
               <strong>{{ evaluationLabel(activeEvaluation) }}</strong>
+              <div class="v5-evaluation-scale" aria-label="闭环评价等级">
+                <span class="is-excellent" :class="{ 'is-active': canEvaluate && activeEvaluation.level === 'excellent' }">优秀</span>
+                <span class="is-good" :class="{ 'is-active': canEvaluate && activeEvaluation.level === 'good' }">良好</span>
+                <span class="is-unqualified" :class="{ 'is-active': canEvaluate && activeEvaluation.level === 'unqualified' }">不合格</span>
+              </div>
               <p>{{ canEvaluate ? activeEvaluation.reason : '当前数据状态不允许生成闭环评价' }}</p>
               <small v-if="activeEvaluation.overdue">解决目标已超时，完成验证前仍保持待评价</small>
             </div>
@@ -324,7 +417,15 @@ onBeforeUnmount(() => {
             <div v-if="filteredRows.length === 0" class="v5-list-empty">当前筛选状态下没有问题记录</div>
           </div>
         </section>
-      </aside>
+        </aside>
+      </template>
+
+      <section v-else class="v5-scope-empty" aria-live="polite">
+        <span>NO MATCHING PROBLEMS</span>
+        <strong>当前车间与产线没有问题记录</strong>
+        <p>当前筛选范围没有可展示的演示问题，因此不生成曲线、责任人或闭环评价。</p>
+        <button type="button" @click="resetScope">查看全部车间</button>
+      </section>
     </section>
   </main>
 </template>
