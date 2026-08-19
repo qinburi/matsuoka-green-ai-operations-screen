@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import * as echarts from 'echarts/core'
 import type { EChartsCoreOption } from 'echarts/core'
-import { BarChart, CustomChart, FunnelChart, GraphChart, HeatmapChart, LineChart, PieChart, RadarChart, SankeyChart, ScatterChart } from 'echarts/charts'
-import { DataZoomComponent, DatasetComponent, GraphicComponent, GridComponent, LegendComponent, MarkAreaComponent, MarkLineComponent, PolarComponent, RadarComponent, TitleComponent, TooltipComponent, VisualMapComponent } from 'echarts/components'
+import { BarChart, CustomChart, FunnelChart, GaugeChart, GraphChart, HeatmapChart, LineChart, PieChart, RadarChart, SankeyChart, ScatterChart } from 'echarts/charts'
+import { DataZoomComponent, DatasetComponent, GraphicComponent, GridComponent, LegendComponent, MarkAreaComponent, MarkLineComponent, MarkPointComponent, PolarComponent, RadarComponent, TitleComponent, TooltipComponent, VisualMapComponent } from 'echarts/components'
 import { CanvasRenderer } from 'echarts/renderers'
 import { nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import type { DataState } from '../types'
@@ -11,6 +11,7 @@ echarts.use([
   BarChart,
   CustomChart,
   FunnelChart,
+  GaugeChart,
   GraphChart,
   HeatmapChart,
   LineChart,
@@ -25,6 +26,7 @@ echarts.use([
   LegendComponent,
   MarkAreaComponent,
   MarkLineComponent,
+  MarkPointComponent,
   PolarComponent,
   RadarComponent,
   TitleComponent,

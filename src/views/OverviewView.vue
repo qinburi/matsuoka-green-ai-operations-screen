@@ -9,13 +9,13 @@ const factoryBackdropUrl = `${import.meta.env.BASE_URL}assets/factory-operations
 
 function enter(entry: keyof typeof entryContexts) {
   const context = entryContexts[entry]
-  const analysisRouteName = route.meta.uiVersion === 'v3.0.0'
-    ? 'v3-analysis'
-    : route.meta.uiVersion === 'v2.1.0'
-    ? 'v21-analysis'
-    : route.meta.uiVersion === 'v2.0.0'
-      ? 'v2-analysis'
-      : 'analysis'
+  const versionAnalysisRoutes: Record<string, string> = {
+    'v4.0.0': 'v4-analysis',
+    'v3.0.0': 'v3-analysis',
+    'v2.1.0': 'v21-analysis',
+    'v2.0.0': 'v2-analysis',
+  }
+  const analysisRouteName = versionAnalysisRoutes[route.meta.uiVersion] ?? 'analysis'
   router.push({
     name: analysisRouteName,
     query: {

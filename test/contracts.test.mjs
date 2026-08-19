@@ -1,10 +1,11 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { readFileSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { hotspotContexts, rawTopics } from '../src/data/demo-raw.mjs'
 import { demoScenarioRaw, factoryZonesRaw, issueRelationsRaw } from '../src/data/factory-scene-raw.mjs'
 import { alertRuleConfigRaw, calculateStabilityAssessmentRaw, evaluateAlertSequenceRaw } from '../src/data/v4-rules-raw.mjs'
 import { deriveProblemClosureStatusRaw, sanitizeInterventionDraftsRaw } from '../src/data/v4-problem-closure-raw.mjs'
+import { buildCustomPulseRangeRaw, evaluatePulseClosureRaw } from '../src/data/v5-pulse-raw.mjs'
 
 const readProjectFile = (path) => readFileSync(new URL(`../${path}`, import.meta.url), 'utf-8')
 
@@ -58,12 +59,14 @@ test('当前产品版本与package版本一致且保留完整版本配置', () =
   const configuredVersion = versionSource.match(/CURRENT_PRODUCT_VERSION = '(v[^']+)'/)?.[1]
 
   assert.equal(configuredVersion, `v${packageJson.version}`)
+  assert.match(versionSource, /version: 'v5\.0\.0'/)
   assert.match(versionSource, /version: 'v4\.0\.0'/)
   assert.match(versionSource, /version: 'v3\.0\.0'/)
   assert.match(versionSource, /version: 'v2\.1\.0'/)
   assert.match(versionSource, /version: 'v2\.0\.0'/)
   assert.match(versionSource, /version: 'v1\.0\.0'/)
-  assert.match(versionSource, /prototypeRoutes: \{ overview: 'overview', analysis: 'analysis' \}/)
+  assert.match(versionSource, /version: 'v5\.0\.0'[\s\S]*?status: 'current'[\s\S]*?prototypeRoutes: \{ overview: 'overview', analysis: 'analysis' \}/)
+  assert.match(versionSource, /version: 'v4\.0\.0'[\s\S]*?status: 'archived'[\s\S]*?prototypeRoutes: \{ overview: 'v4-overview', analysis: 'v4-analysis' \}/)
   assert.match(versionSource, /prototypeRoutes: \{ overview: 'v3-overview', analysis: 'v3-analysis' \}/)
   assert.match(versionSource, /prototypeRoutes: \{ overview: 'v21-overview', analysis: 'v21-analysis' \}/)
   assert.match(versionSource, /prototypeRoutes: \{ overview: 'v2-overview', analysis: 'v2-analysis' \}/)
@@ -73,11 +76,13 @@ test('当前产品版本与package版本一致且保留完整版本配置', () =
   assert.match(versionSource, /id: 'v21-semantic-motion'/)
 })
 
-test('十条版本路由具有明确页面类型和版本元数据', () => {
+test('十二条版本路由具有明确页面类型和版本元数据', () => {
   const routerSource = readProjectFile('src/router.ts')
 
   assert.match(routerSource, /path: '\/', name: 'overview'.*uiVersion: CURRENT_PRODUCT_VERSION, viewKind: 'overview'/)
-  assert.match(routerSource, /path: '\/analysis', name: 'analysis'.*uiVersion: CURRENT_PRODUCT_VERSION, viewKind: 'analysis'/)
+  assert.match(routerSource, /path: '\/analysis', name: 'analysis', component: V5PulseView.*uiVersion: CURRENT_PRODUCT_VERSION, viewKind: 'analysis'/)
+  assert.match(routerSource, /path: '\/v4\/', alias: '\/v4', name: 'v4-overview'.*uiVersion: 'v4\.0\.0', viewKind: 'overview'/)
+  assert.match(routerSource, /path: '\/v4\/analysis', name: 'v4-analysis', component: V4HealthInterventionView.*uiVersion: 'v4\.0\.0', viewKind: 'analysis'/)
   assert.match(routerSource, /path: '\/v3\/', alias: '\/v3', name: 'v3-overview'.*uiVersion: 'v3\.0\.0', viewKind: 'overview'/)
   assert.match(routerSource, /path: '\/v3\/analysis', name: 'v3-analysis'.*uiVersion: 'v3\.0\.0', viewKind: 'analysis'/)
   assert.match(routerSource, /path: '\/v21\/', alias: '\/v21', name: 'v21-overview'.*uiVersion: 'v2\.1\.0', viewKind: 'overview'/)
@@ -86,6 +91,96 @@ test('十条版本路由具有明确页面类型和版本元数据', () => {
   assert.match(routerSource, /path: '\/v2\/analysis', name: 'v2-analysis'.*uiVersion: 'v2\.0\.0', viewKind: 'analysis'/)
   assert.match(routerSource, /path: '\/v1\/', alias: '\/v1', name: 'v1-overview'.*uiVersion: 'v1\.0\.0', viewKind: 'overview'/)
   assert.match(routerSource, /path: '\/v1\/analysis', name: 'v1-analysis'.*uiVersion: 'v1\.0\.0', viewKind: 'analysis'/)
+})
+
+test('V5使用问题脉搏单屏且V4保留完整历史分析页', () => {
+  const viewSource = readProjectFile('src/views/V5PulseView.vue')
+  const styleSource = readProjectFile('src/v5-pulse.css')
+  const routerSource = readProjectFile('src/router.ts')
+  const overviewSource = readProjectFile('src/views/OverviewView.vue')
+
+  assert.match(viewSource, /态势感知 · 敏捷管控中心/)
+  assert.match(viewSource, /问题闭环时间节点/)
+  assert.match(viewSource, /问题清单/)
+  assert.match(viewSource, /当前责任人/)
+  assert.match(viewSource, /buildPulseTrendOption/)
+  assert.match(viewSource, /buildPulseEfficiencyGaugeOption/)
+  assert.match(viewSource, /\(\) => route\.query\.problem, \(\) => route\.query\.focus/)
+  assert.match(viewSource, /\(\) => route\.query\.from, \(\) => route\.query\.to/)
+  assert.match(viewSource, /window\.clearTimeout\(loadingTimer\)/)
+  assert.doesNotMatch(viewSource, /生命周期|进入三步分析|原因与方案|责任与验证/)
+  assert.match(styleSource, /\.v5-workspace\s*\{[\s\S]*grid-template-columns: minmax\(0, 2\.05fr\) minmax\(354px, 1fr\)/)
+  assert.match(styleSource, /@media \(max-width: 1179px\)/)
+  assert.match(routerSource, /name: 'v4-analysis', component: V4HealthInterventionView/)
+  assert.match(overviewSource, /'v4\.0\.0': 'v4-analysis'/)
+})
+
+test('V5日周月自定义曲线具有稳定口径和桌面时段', () => {
+  const dataSource = readProjectFile('src/data/v5-pulse.ts')
+  const chartSource = readProjectFile('src/v5-chart-options.ts')
+  const typeSource = readProjectFile('src/types.ts')
+
+  assert.match(typeSource, /type PulsePeriodKey = 'today' \| 'week' \| 'month' \| 'custom'/)
+  assert.match(dataSource, /length: 10/)
+  assert.match(dataSource, /index \+ 8/)
+  assert.match(dataSource, /currentLabel: '今日', comparisonLabel: '昨日'/)
+  assert.match(dataSource, /currentLabel: '本周', comparisonLabel: '上周同期'/)
+  assert.match(dataSource, /currentLabel: '本月', comparisonLabel: '上月同期'/)
+  assert.match(chartSource, /markArea/)
+  assert.match(chartSource, /markLine/)
+  assert.match(chartSource, /问题发生/)
+  assert.match(chartSource, /首次响应/)
+  assert.match(chartSource, /实际处理/)
+  assert.match(chartSource, /验证完成/)
+
+  const singleDay = buildCustomPulseRangeRaw('2026-08-12', '2026-08-12')
+  assert.equal(singleDay.granularity, 'hour')
+  assert.equal(singleDay.labels.length, 10)
+  const twelveDays = buildCustomPulseRangeRaw('2026-08-01', '2026-08-12')
+  assert.equal(twelveDays.granularity, 'day')
+  assert.equal(twelveDays.labels.length, 12)
+  const longRange = buildCustomPulseRangeRaw('2026-06-01', '2026-08-12')
+  assert.equal(longRange.granularity, 'week')
+  assert.ok(longRange.labels.length > 8)
+})
+
+test('V5闭环评价只在验证完成后形成且区分时效与复发', () => {
+  const base = {
+    occurredAt: '2026-08-12T09:00:00+08:00',
+    responseAt: '2026-08-12T09:10:00+08:00',
+    handledAt: '2026-08-12T10:00:00+08:00',
+    verifiedAt: '2026-08-12T11:00:00+08:00',
+    responseTargetAt: '2026-08-12T09:15:00+08:00',
+    resolutionTargetAt: '2026-08-12T12:00:00+08:00',
+    status: 'verified',
+    evidenceComplete: true,
+    recurredAt: null,
+  }
+  assert.equal(evaluatePulseClosureRaw(base, '2026-08-12T13:00:00+08:00').level, 'excellent')
+  assert.equal(evaluatePulseClosureRaw({ ...base, responseAt: '2026-08-12T09:30:00+08:00' }, '2026-08-12T13:00:00+08:00').level, 'good')
+  const pending = evaluatePulseClosureRaw({ ...base, status: 'processing', verifiedAt: null }, '2026-08-12T13:00:00+08:00')
+  assert.equal(pending.level, 'pending')
+  assert.equal(pending.overdue, true)
+  assert.equal(evaluatePulseClosureRaw({ ...base, status: 'verified', evidenceComplete: false }, '2026-08-12T13:00:00+08:00').level, 'pending')
+  assert.equal(evaluatePulseClosureRaw({ ...base, status: 'recurred', recurredAt: '2026-08-12T12:30:00+08:00' }, '2026-08-12T13:00:00+08:00').level, 'unqualified')
+})
+
+test('V5责任人头像为本地演示资源且绿色对钩只属于验证解决', () => {
+  const dataSource = readProjectFile('src/data/v5-pulse.ts')
+  const viewSource = readProjectFile('src/views/V5PulseView.vue')
+  const styleSource = readProjectFile('src/v5-pulse.css')
+  const avatars = ['v5-owner-quality.svg', 'v5-owner-sewing.svg', 'v5-owner-cutting.svg', 'v5-owner-packaging.svg']
+
+  for (const avatar of avatars) {
+    assert.ok(existsSync(new URL(`../public/assets/avatars/${avatar}`, import.meta.url)))
+    assert.match(dataSource, new RegExp(avatar.replace('.', '\\.')))
+  }
+  assert.match(viewSource, /timeline\.status === 'verified' && evaluation\.isResolved/)
+  assert.match(viewSource, /return '✓'/)
+  assert.match(styleSource, /\.v5-problem-row\.is-resolved/)
+  assert.match(styleSource, /@keyframes v5-resolved-check/)
+  assert.match(dataSource, /isDemo: true/)
+  assert.doesNotMatch(viewSource, /发送消息|企业微信|员工能力|员工态度/)
 })
 
 test('版本卡片直接切换同类页面并保留查询上下文', () => {

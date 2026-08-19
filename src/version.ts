@@ -19,16 +19,58 @@ export interface VersionRelease {
   changes: readonly VersionChange[]
 }
 
-export const CURRENT_PRODUCT_VERSION = 'v4.0.0'
+export const CURRENT_PRODUCT_VERSION = 'v5.0.0'
 
 // Future versions are added here manually together with their routes and append-only changes.
 export const versionHistory: readonly VersionRelease[] = [
   {
+    version: 'v5.0.0',
+    releasedAt: '2026-08-19',
+    title: '态势感知与敏捷管控中心',
+    status: 'current',
+    prototypeRoutes: { overview: 'overview', analysis: 'analysis' },
+    highlights: [
+      '取消生命周期与多步骤分析，把当前问题、责任人、处理时效和闭环结果集中在一个单屏中。',
+      '使用问题脉搏曲线展示日、周、月及自定义区间趋势，并对比昨日或上一同期。',
+      '增加问题发生、响应、处理、验证四个时间节点，以及基于时效与证据的闭环评价。',
+      '问题清单常驻展示责任人通用头像、当前耗时、解决状态与验证通过绿色对钩。',
+    ],
+    boundaries: [
+      '全部问题、人员、头像、时间、目标和评价均为演示数据，不代表真实生产记录或正式考核结果。',
+      '闭环评价只针对单次问题处置，不评价员工能力、态度或人事绩效。',
+      '责任人仅为页面关联展示，不模拟消息已发送、正式派单或企业微信回执。',
+      'V5仅提供桌面端与大屏布局，不制作手机端；未连接真实接口或模型服务。',
+    ],
+    changes: [
+      {
+        id: 'v5-pulse-command',
+        changedAt: '2026-08-19',
+        category: '整体重构',
+        title: '建立问题脉搏单屏管控中心',
+        description: '以问题曲线、责任人、时效和闭环评价替代生命周期画布及三步分析链。',
+      },
+      {
+        id: 'v5-period-comparison',
+        changedAt: '2026-08-19',
+        category: '趋势对比',
+        title: '增加日周月与自定义同期曲线',
+        description: '日视图按08:00至17:00逐小时对比今日与昨日，周月及自定义区间按相同统计口径对比。',
+      },
+      {
+        id: 'v5-owner-evaluation',
+        changedAt: '2026-08-19',
+        category: '责任闭环',
+        title: '增加责任人头像与闭环评价',
+        description: '记录发生、响应、处理和验证时间；证据完整后按时效形成优秀、良好或不合格评价。',
+      },
+    ],
+  },
+  {
     version: 'v4.0.0',
     releasedAt: '2026-08-12',
     title: '蓝白AI生命周期分析画布',
-    status: 'current',
-    prototypeRoutes: { overview: 'overview', analysis: 'analysis' },
+    status: 'archived',
+    prototypeRoutes: { overview: 'v4-overview', analysis: 'v4-analysis' },
     highlights: [
       '以全屏十节点生命周期流图替代三栏管理后台，管理结论与问题状态在同一分析画布中呈现。',
       '覆盖订单计划至成品仓的十个可管理生命周期节点，并排除无法取得数据的海运、码头与清关环节。',

@@ -160,16 +160,16 @@ export function buildLifecycleCanvasOption(
                 lineDashOffset: 0,
                 shadowBlur: 7,
                 shadowColor: 'rgba(22,168,213,.38)',
-                fill: null,
+                fill: 'none',
               },
-              keyframeAnimation: motionEnabled ? {
+              keyframeAnimation: motionEnabled ? ({
                 duration: 3600,
                 loop: true,
                 keyframes: [
                   { percent: 0, style: { lineDashOffset: 0 } },
                   { percent: 1, style: { lineDashOffset: -120 } },
                 ],
-              } : undefined,
+              } as any) : undefined,
             },
           ],
         }),

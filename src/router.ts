@@ -12,6 +12,7 @@ const OverviewView = () => import('./views/OverviewView.vue')
 const AnalysisView = () => import('./views/AnalysisView.vue')
 const V3AnalysisView = () => import('./views/V3AnalysisView.vue')
 const V4HealthInterventionView = () => import('./views/V4HealthInterventionView.vue')
+const V5PulseView = () => import('./views/V5PulseView.vue')
 const V1OverviewView = () => import('./legacy/v1/V1OverviewView.vue')
 const V1AnalysisView = () => import('./legacy/v1/V1AnalysisView.vue')
 
@@ -19,7 +20,9 @@ export default createRouter({
   history: createWebHashHistory(),
   routes: [
     { path: '/', name: 'overview', component: OverviewView, meta: { uiVersion: CURRENT_PRODUCT_VERSION, viewKind: 'overview' } },
-    { path: '/analysis', name: 'analysis', component: V4HealthInterventionView, meta: { uiVersion: CURRENT_PRODUCT_VERSION, viewKind: 'analysis' } },
+    { path: '/analysis', name: 'analysis', component: V5PulseView, meta: { uiVersion: CURRENT_PRODUCT_VERSION, viewKind: 'analysis' } },
+    { path: '/v4/', alias: '/v4', name: 'v4-overview', component: OverviewView, meta: { uiVersion: 'v4.0.0', viewKind: 'overview' } },
+    { path: '/v4/analysis', name: 'v4-analysis', component: V4HealthInterventionView, meta: { uiVersion: 'v4.0.0', viewKind: 'analysis' } },
     { path: '/v3/', alias: '/v3', name: 'v3-overview', component: OverviewView, meta: { uiVersion: 'v3.0.0', viewKind: 'overview' } },
     { path: '/v3/analysis', name: 'v3-analysis', component: V3AnalysisView, meta: { uiVersion: 'v3.0.0', viewKind: 'analysis' } },
     { path: '/v21/', alias: '/v21', name: 'v21-overview', component: OverviewView, meta: { uiVersion: 'v2.1.0', viewKind: 'overview' } },

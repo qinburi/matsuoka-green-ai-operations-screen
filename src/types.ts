@@ -314,6 +314,11 @@ export type ProblemClosureFilter = 'all' | ProblemClosureStatus
 export type ProblemListScope = 'node' | 'factory'
 export type InterventionEditorRole = 'factory-manager' | 'department-owner' | 'viewer'
 export type InterventionVerificationStatus = 'not-started' | 'pending-verification' | 'verifying' | 'verified' | 'recurred'
+export type PulsePeriodKey = 'today' | 'week' | 'month' | 'custom'
+export type PulseGranularity = 'hour' | 'day' | 'week'
+export type PulseAggregation = 'average' | 'peak' | 'sum'
+export type ClosureEvaluationLevel = 'pending' | 'excellent' | 'good' | 'unqualified'
+export type PulseCaseStatus = 'pending' | 'processing' | 'verified' | 'failed' | 'recurred'
 
 export interface LifecycleMetric {
   label: string
@@ -543,4 +548,70 @@ export interface ProblemAnalysisProfile {
   }
   candidateEvidence: readonly { category: string; completeness: number; priority: number; dataCondition: number; label: string }[]
   actionCandidates: readonly { id: string; label: string; difficulty: number; impact: number; verificationHours: number; dataReadiness: number; category: string }[]
+}
+
+export interface ProblemTrendSeries {
+  labels: string[]
+  currentValues: number[]
+  comparisonValues: number[]
+  currentLabel: string
+  comparisonLabel: string
+  rangeLabel: string
+  comparisonRangeLabel: string
+  granularity: PulseGranularity
+}
+
+export interface ProblemTrendProfile {
+  problemId: string
+  metricLabel: string
+  unit: string
+  definition: string
+  source: string
+  aggregation: PulseAggregation
+  normalMax: number
+  warningMax: number
+  decimals: number
+  dayCurrent: number[]
+  dayComparison: number[]
+}
+
+export interface ProblemOwnerProfile {
+  id: string
+  problemId: string
+  displayName: string
+  department: string
+  role: string
+  avatarAsset: string
+  isDemo: true
+}
+
+export interface ProblemClosureTimeline {
+  problemId: string
+  ownerId: string
+  occurredAt: string
+  responseAt: string | null
+  handledAt: string | null
+  verifiedAt: string | null
+  responseTargetAt: string | null
+  resolutionTargetAt: string | null
+  status: PulseCaseStatus
+  actualMeasure: string | null
+  verificationEvidence: string | null
+  evidenceComplete: boolean
+  recurredAt: string | null
+  isDemo: true
+}
+
+export interface ClosureEvaluation {
+  level: ClosureEvaluationLevel
+  label: string
+  reason: string
+  isResolved: boolean
+  responseMinutes: number | null
+  handlingMinutes: number | null
+  verificationMinutes: number | null
+  totalMinutes: number | null
+  responseOnTime: boolean | null
+  resolutionOnTime: boolean | null
+  overdue: boolean
 }
